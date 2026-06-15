@@ -1,6 +1,9 @@
 import ResultsForm from "@/components/admin/ResultsForm";
-import { supabase } from "@/lib/supabase";
 import DeleteResultButton from "@/components/admin/DeleteResultButton";
+import { supabase } from "@/lib/supabase";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function AdminResultsPage() {
   const { data: season } = await supabase
@@ -27,14 +30,28 @@ export default async function AdminResultsPage() {
     .eq("season_id", season?.id)
     .order("created_at", { ascending: true });
 
-      const { data: results } = await supabase
+  const { data: results } = await supabase
     .from("competition_results")
-    .select("id, points, result_label, is_official, team_id, player_id, competitions(name), teams(name), players(full_name)")
+    .select(
+      "id, points, result_label, is_official, team_id, player_id, competitions(name), teams(name), players(full_name)"
+    )
     .eq("is_official", true)
     .order("created_at", { ascending: false });
 
+  const groupedResults = ((results as any[]) ?? []).reduce((acc, result) => {
+    const competitionName = result.competitions?.name ?? "Competition";
+
+    if (!acc[competitionName]) {
+      acc[competitionName] = [];
+    }
+
+    acc[competitionName].push(result);
+
+    return acc;
+  }, {} as Record<string, any[]>);
+
   return (
-    <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
+    <main className="min-h-screen px-5 pb-32 pt-6 text-danvers-text">
       <section className="mx-auto max-w-5xl">
         <div className="rounded-[2rem] border border-danvers-border bg-danvers-surface p-6">
           <p className="text-xs font-bold uppercase tracking-[0.35em] text-danvers-brass">
@@ -46,34 +63,65 @@ export default async function AdminResultsPage() {
             finalized.
           </p>
         </div>
+
         <section className="mt-8 rounded-[2rem] border border-danvers-border bg-danvers-surface p-6">
           <h2 className="text-2xl font-black">Official Results Entered</h2>
 
-          <div className="mt-5 grid gap-3">
-            {results?.length ? (
-              results.map((result: any) => (
-                <div
-                  key={result.id}
-                  className="rounded-2xl border border-danvers-border bg-black/20 p-4"
-                >
-                  <p className="font-black">
-  {result.teams?.name ?? result.players?.full_name ?? "Unknown"} ·{" "}
-  {result.points} point(s)
-</p>
-                  <p className="mt-1 text-sm text-danvers-muted">
-                    {result.competitions?.name ?? "Competition"}
-                  </p>
-                  <p className="mt-1 text-xs text-danvers-muted">
-                    {result.result_label ?? "No label"}
-                  </p>
-                  <DeleteResultButton resultId={result.id} />
-                </div>
-              ))
+          <div className="mt-5 grid gap-6">
+            {Object.entries(groupedResults).length ? (
+              (Object.entries(groupedResults) as [string, any[]][]).map(
+  ([competitionName, rows]) => (
+                <details
+  key={competitionName}
+  className="rounded-3xl border border-danvers-border bg-black/20 p-4"
+>
+  <summary className="cursor-pointer list-none">
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <h3 className="text-xl font-black">{competitionName}</h3>
+        <p className="mt-1 text-sm text-danvers-muted">
+          {rows.length} official result(s)
+        </p>
+      </div>
+
+      <span className="text-sm font-black text-danvers-muted">
+        Expand
+      </span>
+    </div>
+  </summary>
+
+  <div className="mt-4 grid gap-3">
+                    {rows.map((result: any) => (
+                      <div
+                        key={result.id}
+                        className="rounded-2xl border border-danvers-border bg-black/20 p-4"
+                      >
+                        <p className="font-black">
+                          {result.teams?.name ??
+                            result.players?.full_name ??
+                            "Unknown"}{" "}
+                          · {result.points} point(s)
+                        </p>
+
+                        <p className="mt-1 text-xs text-danvers-muted">
+                          {result.result_label ?? "No label"}
+                        </p>
+
+                        <DeleteResultButton resultId={result.id} />
+                      </div>
+                    ))}
+                  </div>
+                </details>
+                )
+)
             ) : (
-              <p className="text-danvers-muted">No official results entered yet.</p>
+              <p className="text-danvers-muted">
+                No official results entered yet.
+              </p>
             )}
           </div>
         </section>
+
         <ResultsForm
           competitions={(competitions as any[]) ?? []}
           teams={(teams as any[]) ?? []}

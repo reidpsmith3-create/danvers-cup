@@ -58,13 +58,36 @@ export async function POST(request: Request) {
 
   const { data: scores, error: scoresError } = await supabase
     .from("scores")
-    .select("player_id, hole_number, gross_score, course_holes(par)")
-    .eq("round_id", competition.round_id)
-    .eq("course_holes.course_id", courseId);
+    .select("player_id, hole_number, gross_score")
+    .eq("round_id", competition.round_id);
 
   if (scoresError) {
     return NextResponse.json({ error: scoresError.message }, { status: 500 });
   }
+
+  const { data: courseHoles, error: courseHolesError } = await supabase
+    .from("course_holes")
+    .select("hole_number, par")
+    .eq("course_id", courseId);
+
+  if (courseHolesError) {
+    return NextResponse.json(
+      { error: courseHolesError.message },
+      { status: 500 }
+    );
+  }
+
+  const parByHole = new Map(
+    ((courseHoles as any[]) ?? []).map((hole) => [hole.hole_number, hole.par])
+  );
+
+  const stablefordScores =
+    scores?.map((score: any) => ({
+      ...score,
+      course_holes: {
+        par: parByHole.get(score.hole_number),
+      },
+    })) ?? [];
 
   const settings = competition.settings ?? {};
 
@@ -77,7 +100,7 @@ export async function POST(request: Request) {
 
   const rows: any[] = [];
 
-  const individualResults = calculateStablefordResults((scores as any[]) ?? []);
+  const individualResults = calculateStablefordResults(stablefordScores);
 
   if (competition.counts_for_individual_points) {
     individualResults.forEach((result) => {
