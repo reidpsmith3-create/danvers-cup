@@ -2,6 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  COMPETITION_SCORING_RULES,
+  getCompetitionScoringRule,
+} from "@/lib/scoring/competitionScoring";
 
 type Round = {
   id: string;
@@ -23,15 +27,47 @@ export default function CompetitionForm({
   const [format, setFormat] = useState("match");
   const [scoringBasis, setScoringBasis] = useState("gross");
   const [handicapPercent, setHandicapPercent] = useState("100");
+
+  const [pointsForFirst, setPointsForFirst] = useState("5");
+  const [pointsForSecond, setPointsForSecond] = useState("3");
+  const [pointsForThird, setPointsForThird] = useState("2");
+  const [pointsForFourth, setPointsForFourth] = useState("1");
+
+  const [winPoints, setWinPoints] = useState("2");
+  const [tiePoints, setTiePoints] = useState("1");
+
+  const [teamScoringMethod, setTeamScoringMethod] = useState("best_2_total");
+
   const [countsForTeamPoints, setCountsForTeamPoints] = useState(true);
   const [countsForIndividualPoints, setCountsForIndividualPoints] =
     useState(true);
+
   const [message, setMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  const scoringRule = getCompetitionScoringRule(format);
 
   async function saveCompetition() {
     setIsSaving(true);
     setMessage("");
+
+    if (countsForTeamPoints && !scoringRule.supportsTeamPoints) {
+      setMessage("This format does not support team points.");
+      setIsSaving(false);
+      return;
+    }
+
+    if (countsForIndividualPoints && !scoringRule.supportsIndividualPoints) {
+      setMessage("This format does not support individual points.");
+      setIsSaving(false);
+      return;
+    }
+
+    if (!name.trim()) {
+      setMessage("Competition name is required.");
+      setIsSaving(false);
+      return;
+    }
 
     const response = await fetch("/api/admin/competitions", {
       method: "POST",
@@ -41,12 +77,21 @@ export default function CompetitionForm({
       body: JSON.stringify({
         seasonId,
         roundId,
-        name,
+        name: name.trim(),
         format,
         scoringBasis,
         handicapPercent,
         countsForTeamPoints,
         countsForIndividualPoints,
+        settings: {
+          pointsForFirst: Number(pointsForFirst),
+          pointsForSecond: Number(pointsForSecond),
+          pointsForThird: Number(pointsForThird),
+          pointsForFourth: Number(pointsForFourth),
+          winPoints: Number(winPoints),
+          tiePoints: Number(tiePoints),
+          teamScoringMethod,
+        },
       }),
     });
 
@@ -101,15 +146,31 @@ export default function CompetitionForm({
             onChange={(event) => setFormat(event.target.value)}
             className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
           >
-            <option value="match">Match Play</option>
-            <option value="stroke">Stroke Play</option>
-            <option value="stableford">Stableford</option>
-            <option value="best_ball">Best Ball</option>
-            <option value="wolf">Wolf</option>
-            <option value="skins">Skins</option>
-            <option value="custom">Custom</option>
+            {COMPETITION_SCORING_RULES.map((rule) => (
+  <option key={rule.format} value={rule.format}>
+    {rule.label}
+  </option>
+))}
           </select>
         </label>
+
+        <div className="rounded-2xl border border-danvers-border bg-black/20 p-4">
+          <p className="text-sm font-black">{scoringRule.label}</p>
+          <p className="mt-2 text-sm leading-6 text-danvers-muted">
+            {scoringRule.description}
+          </p>
+
+          <div className="mt-3 grid gap-2 text-xs font-bold text-danvers-muted sm:grid-cols-2">
+            <p>Uses matches: {scoringRule.usesMatches ? "Yes" : "No"}</p>
+            <p>Uses scores: {scoringRule.usesRawScores ? "Yes" : "No"}</p>
+            <p>Team points: {scoringRule.supportsTeamPoints ? "Yes" : "No"}</p>
+<p>
+  Individual points:{" "}
+  {scoringRule.supportsIndividualPoints ? "Yes" : "No"}
+</p>
+<p>Calculator: {scoringRule.hasCalculator ? "Yes" : "Manual"}</p>
+          </div>
+        </div>
 
         <label className="grid gap-2">
           <span className="text-sm font-bold text-danvers-muted">
@@ -136,6 +197,92 @@ export default function CompetitionForm({
             inputMode="decimal"
             className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
           />
+        </label>
+
+        <div className="grid gap-4 sm:grid-cols-4">
+          <label className="grid gap-2">
+            <span className="text-sm font-bold text-danvers-muted">
+              1st Place
+            </span>
+            <input
+              value={pointsForFirst}
+              onChange={(event) => setPointsForFirst(event.target.value)}
+              className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+            />
+          </label>
+
+          <label className="grid gap-2">
+            <span className="text-sm font-bold text-danvers-muted">
+              2nd Place
+            </span>
+            <input
+              value={pointsForSecond}
+              onChange={(event) => setPointsForSecond(event.target.value)}
+              className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+            />
+          </label>
+
+          <label className="grid gap-2">
+            <span className="text-sm font-bold text-danvers-muted">
+              3rd Place
+            </span>
+            <input
+              value={pointsForThird}
+              onChange={(event) => setPointsForThird(event.target.value)}
+              className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+            />
+          </label>
+
+          <label className="grid gap-2">
+            <span className="text-sm font-bold text-danvers-muted">
+              4th Place
+            </span>
+            <input
+              value={pointsForFourth}
+              onChange={(event) => setPointsForFourth(event.target.value)}
+              className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="grid gap-2">
+            <span className="text-sm font-bold text-danvers-muted">
+              Match Win Points
+            </span>
+            <input
+              value={winPoints}
+              onChange={(event) => setWinPoints(event.target.value)}
+              className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+            />
+          </label>
+
+          <label className="grid gap-2">
+            <span className="text-sm font-bold text-danvers-muted">
+              Match Tie Points
+            </span>
+            <input
+              value={tiePoints}
+              onChange={(event) => setTiePoints(event.target.value)}
+              className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+            />
+          </label>
+        </div>
+
+        <label className="grid gap-2">
+          <span className="text-sm font-bold text-danvers-muted">
+            Team Scoring Method
+          </span>
+          <select
+            value={teamScoringMethod}
+            onChange={(event) => setTeamScoringMethod(event.target.value)}
+            className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+          >
+            <option value="best_1_total">Best 1 player total</option>
+            <option value="best_2_total">Best 2 player totals</option>
+            <option value="best_3_total">Best 3 player totals</option>
+            <option value="all_players_total">All player totals</option>
+          </select>
         </label>
 
         <label className="flex items-center gap-3 text-sm font-bold">

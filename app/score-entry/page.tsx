@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import ScoreEntryForm from "@/components/score-entry/ScoreEntryForm";
+import { getCurrentRound } from "@/lib/rounds/getCurrentRound";
 
 type ScoreEntryPageProps = {
   searchParams?: {
@@ -11,7 +12,9 @@ type ScoreEntryPageProps = {
 export default async function ScoreEntryPage({
   searchParams,
 }: ScoreEntryPageProps) {
-  const selectedRoundNumber = Number(searchParams?.round ?? 1);
+  const requestedRoundNumber = searchParams?.round
+  ? Number(searchParams.round)
+  : null;
 
   const { data: season } = await supabase
     .from("seasons")
@@ -25,9 +28,13 @@ export default async function ScoreEntryPage({
     .eq("season_id", season?.id)
     .order("round_number", { ascending: true });
 
-  const round =
-    rounds?.find((item) => item.round_number === selectedRoundNumber) ??
-    rounds?.[0];
+  const liveRound = rounds?.find((item) => item.status === "live");
+
+const round = requestedRoundNumber
+  ? rounds?.find((item) => item.round_number === requestedRoundNumber) ??
+    liveRound ??
+    rounds?.[0]
+  : liveRound ?? rounds?.[0];
 
   const { data: players } = await supabase
     .from("season_players")

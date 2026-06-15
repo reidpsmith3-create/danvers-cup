@@ -1,5 +1,21 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { getCurrentRound } from "@/lib/rounds/getCurrentRound";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+function getMatchStatus(holes: any[]) {
+  const teamAWins = holes.filter((hole) => hole.winning_side === "team_a").length;
+  const teamBWins = holes.filter((hole) => hole.winning_side === "team_b").length;
+  const margin = Math.abs(teamAWins - teamBWins);
+
+  if (margin === 0) return "All Square";
+
+  return teamAWins > teamBWins
+    ? `Team A ${margin} Up`
+    : `Team B ${margin} Up`;
+}
 
 export default async function LivePage() {
   const { data: season } = await supabase
@@ -8,13 +24,29 @@ export default async function LivePage() {
     .eq("year", 2026)
     .single();
 
-  const { data: round } = await supabase
-    .from("rounds")
-    .select("*, courses(name, city, state)")
-    .eq("season_id", season?.id)
-    .order("round_number", { ascending: true })
-    .limit(1)
-    .single();
+  const round = season ? await getCurrentRound(season.id) : null;
+
+  const { data: competitions } = await supabase
+    .from("competitions")
+    .select("id, name, format, round_id")
+    .eq("round_id", round?.id);
+
+  const competitionIds = competitions?.map((competition) => competition.id) ?? [];
+
+  const { data: matches } =
+    competitionIds.length > 0
+      ? await supabase
+          .from("matches")
+          .select("*")
+          .in("competition_id", competitionIds)
+      : { data: [] };
+
+  const matchIds = matches?.map((match) => match.id) ?? [];
+
+  const { data: matchHoles } =
+    matchIds.length > 0
+      ? await supabase.from("match_holes").select("*").in("match_id", matchIds)
+      : { data: [] };
 
   const { data: seasonPlayers } = await supabase
     .from("season_players")
@@ -42,6 +74,8 @@ export default async function LivePage() {
   const playerRows = (seasonPlayers as any[]) ?? [];
   const teamRows = (teams as any[]) ?? [];
   const teamMemberRows = (teamMembers as any[]) ?? [];
+  const matchRows = (matches as any[]) ?? [];
+  const matchHoleRows = (matchHoles as any[]) ?? [];
 
   const individualLeaderboard = playerRows
     .map((seasonPlayer) => {
@@ -129,11 +163,9 @@ export default async function LivePage() {
 
             <div className="rounded-2xl border border-danvers-border bg-black/20 p-4">
               <p className="text-xs uppercase tracking-[0.25em] text-danvers-muted">
-                Tee Time
+                Active Matches
               </p>
-              <p className="mt-2 text-2xl font-black">
-                {round?.tee_time ?? "TBD"}
-              </p>
+              <p className="mt-2 text-4xl font-black">{matchRows.length}</p>
             </div>
           </div>
         </div>
@@ -166,6 +198,49 @@ export default async function LivePage() {
               </div>
             </Link>
           ))}
+        </section>
+
+        <section className="mt-8 rounded-[2rem] border border-danvers-border bg-danvers-surface p-5">
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-brass">
+            Matches
+          </p>
+          <h2 className="mt-2 text-3xl font-black">Current Round</h2>
+
+          <div className="mt-5 grid gap-3">
+            {matchRows.length ? (
+              matchRows.map((match) => {
+                const holes = matchHoleRows.filter(
+                  (hole) => hole.match_id === match.id
+                );
+
+                return (
+                  <div
+                    key={match.id}
+                    className="rounded-2xl border border-danvers-border bg-black/20 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-black">
+                          {match.team_a_name} vs {match.team_b_name}
+                        </p>
+                        <p className="mt-1 text-sm text-danvers-muted">
+                          {holes.length} holes scored
+                        </p>
+                      </div>
+
+                      <p className="text-right text-sm font-black">
+                        {getMatchStatus(holes)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="rounded-2xl border border-danvers-border bg-black/20 p-4 text-danvers-muted">
+                No active matches for this round yet.
+              </p>
+            )}
+          </div>
         </section>
 
         <section className="mt-8 rounded-[2rem] border border-danvers-border bg-danvers-surface p-5">

@@ -185,6 +185,15 @@ export default async function Home() {
             ))}
           </div>
         </section>
+
+        <div className="mt-10 text-center">
+          <a
+            href="/admin"
+            className="text-xs font-bold uppercase tracking-[0.25em] text-danvers-muted hover:text-danvers-text"
+          >
+            Admin
+          </a>
+        </div>
       </section>
     </main>
   );

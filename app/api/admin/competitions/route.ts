@@ -12,6 +12,7 @@ export async function POST(request: Request) {
   const handicapPercent = Number(body.handicapPercent ?? 100);
   const countsForTeamPoints = Boolean(body.countsForTeamPoints);
   const countsForIndividualPoints = Boolean(body.countsForIndividualPoints);
+  const settings = body.settings ?? {};
 
   if (!seasonId || !name || !format || !scoringBasis) {
     return NextResponse.json(
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
     counts_for_individual_points: countsForIndividualPoints,
     is_active: true,
     is_visible: true,
-    settings: {},
+    settings,
   });
 
   if (error) {
