@@ -7,6 +7,10 @@ import CalculateStablefordButton from "@/components/admin/CalculateStablefordBut
 import CalculateStrokeButton from "@/components/admin/CalculateStrokeButton";
 import { getCompetitionScoringRule } from "@/lib/scoring/competitionScoring";
 import { getCompetitionActions } from "@/lib/scoring/getCompetitionActions";
+import {
+  getCompetitionStatus,
+  getCompetitionStatusLabel,
+} from "@/lib/scoring/getCompetitionStatus";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -29,6 +33,14 @@ export default async function AdminCompetitionsPage() {
     .select("*, rounds(round_number, name)")
     .eq("season_id", season?.id)
     .order("created_at", { ascending: true });
+      const { data: scores } = await supabase
+    .from("scores")
+    .select("round_id");
+
+  const { data: results } = await supabase
+    .from("competition_results")
+    .select("competition_id")
+    .eq("is_official", true);
 
   if (!season) {
     return (
@@ -58,15 +70,35 @@ export default async function AdminCompetitionsPage() {
           <div className="mt-5 grid gap-3">
             {competitions?.length ? (
               competitions.map((competition: any) => {
-  const scoringRule = getCompetitionScoringRule(competition.format);
+const scoringRule = getCompetitionScoringRule(competition.format);
 const actions = getCompetitionActions(competition.format);
+
+const scoreCount =
+  scores?.filter((score: any) => score.round_id === competition.round_id)
+    .length ?? 0;
+
+const resultCount =
+  results?.filter(
+    (result: any) => result.competition_id === competition.id
+  ).length ?? 0;
+
+const status = getCompetitionStatus({
+  scoreCount,
+  resultCount,
+});
 
   return (
     <div
       key={competition.id}
       className="rounded-2xl border border-danvers-border bg-black/20 p-4"
     >
-      <p className="font-black">{competition.name}</p>
+      <div className="flex items-start justify-between gap-4">
+  <p className="font-black">{competition.name}</p>
+
+  <span className="rounded-full border border-danvers-border px-3 py-1 text-xs font-black uppercase tracking-[0.15em] text-danvers-muted">
+    {getCompetitionStatusLabel(status)}
+  </span>
+</div>
 
       <p className="mt-1 text-sm text-danvers-muted">
         Round {competition.rounds?.round_number ?? "—"} ·{" "}
@@ -74,12 +106,13 @@ const actions = getCompetitionActions(competition.format);
       </p>
 
       <p className="mt-1 text-xs text-danvers-muted">
-        Team points: {competition.counts_for_team_points ? "Yes" : "No"} ·
-        Individual points:{" "}
-        {competition.counts_for_individual_points ? "Yes" : "No"} ·
-        Handicap: {competition.handicap_percent}% · Calculator:{" "}
-        {scoringRule.hasCalculator ? "Yes" : "Manual"}
-      </p>
+  Team points: {competition.counts_for_team_points ? "Yes" : "No"} ·
+  Individual points:{" "}
+  {competition.counts_for_individual_points ? "Yes" : "No"} ·
+  Handicap: {competition.handicap_percent}% · Calculator:{" "}
+  {scoringRule.hasCalculator ? "Yes" : "Manual"} · Scores: {scoreCount} ·
+  Results: {resultCount}
+</p>
       <div className="mt-3 rounded-xl border border-danvers-border bg-black/20 p-3">
   <p className="text-xs font-black uppercase tracking-[0.2em] text-danvers-muted">
     Required Actions
