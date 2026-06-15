@@ -10,20 +10,21 @@ const config: Config = {
     extend: {
       colors: {
         danvers: {
-          background: "#0a0f0a",
-          surface: "#111827",
-          surface2: "#172033",
-          border: "#1f2937",
-          green: "#3f7d4c",
-          greenDark: "#2d5a27",
-          gold: "#d4af37",
-          text: "#f8fafc",
-          muted: "#94a3b8",
+          background: "#08110d",
+          surface: "#101612",
+          surface2: "#18231c",
+          border: "#26342b",
+          green: "#2f6b45",
+          greenDark: "#183d2a",
+          brass: "#b08d45",
+          gold: "#b08d45",
+          text: "#f4f1e8",
+          muted: "#a7b0a6",
         },
       },
       backgroundImage: {
         "danvers-radial":
-          "radial-gradient(circle at top, rgba(63,125,76,0.28), transparent 35%)",
+          "radial-gradient(circle at top, rgba(47,107,69,0.28), transparent 35%)",
       },
     },
   },
