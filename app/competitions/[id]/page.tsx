@@ -187,17 +187,18 @@ export default async function CompetitionPage({ params }: CompetitionPageProps) 
                 );
 
                 return (
-                  <div
-                    key={match.id}
-                    className="rounded-2xl border border-danvers-border bg-black/20 p-4"
-                  >
+                  <Link
+  key={match.id}
+  href={`/matches/${match.id}`}
+  className="block rounded-2xl border border-danvers-border bg-black/20 p-4 transition hover:border-danvers-green"
+>
                     <p className="font-black">
                       {match.team_a_name} vs {match.team_b_name}
                     </p>
                     <p className="mt-1 text-sm text-danvers-muted">
                       {getMatchStatus(holes)} · {holes.length} holes scored
                     </p>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

@@ -5,6 +5,12 @@ import { getCurrentRound } from "@/lib/rounds/getCurrentRound";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+function formatToPar(value: number) {
+  if (value === 0) return "E";
+  if (value > 0) return `+${value}`;
+  return `${value}`;
+}
+
 function getMatchStatus(holes: any[]) {
   const teamAWins = holes.filter((hole) => hole.winning_side === "team_a").length;
   const teamBWins = holes.filter((hole) => hole.winning_side === "team_b").length;
@@ -66,11 +72,31 @@ export default async function LivePage() {
   const { data: scores } = round
     ? await supabase
         .from("scores")
-        .select("player_id, gross_score")
+        .select("player_id, hole_number, gross_score, updated_at")
         .eq("round_id", round.id)
     : { data: [] };
 
+  const { data: courseHoles } = round?.course_id
+    ? await supabase
+        .from("course_holes")
+        .select("hole_number, par")
+        .eq("course_id", round.course_id)
+    : { data: [] };
+
   const scoreRows = (scores as any[]) ?? [];
+    const recentScores = [...scoreRows]
+    .filter((score) => score.updated_at)
+    .sort(
+      (a, b) =>
+        new Date(b.updated_at).getTime() -
+        new Date(a.updated_at).getTime()
+    )
+    .slice(0, 15);
+  const courseHoleRows = (courseHoles as any[]) ?? [];
+  const parByHole = new Map(
+    courseHoleRows.map((hole) => [hole.hole_number, Number(hole.par)])
+  );
+
   const playerRows = (seasonPlayers as any[]) ?? [];
   const teamRows = (teams as any[]) ?? [];
   const teamMemberRows = (teamMembers as any[]) ?? [];
@@ -83,20 +109,29 @@ export default async function LivePage() {
         (score) => score.player_id === seasonPlayer.player_id
       );
 
+            const totalGross = playerScores.reduce(
+        (sum, score) => sum + Number(score.gross_score),
+        0
+      );
+
+      const totalPar = playerScores.reduce(
+        (sum, score) => sum + Number(parByHole.get(score.hole_number) ?? 0),
+        0
+      );
+
       return {
         playerId: seasonPlayer.player_id,
         name: seasonPlayer.players?.full_name ?? "Unknown Player",
         holesPlayed: playerScores.length,
-        totalGross: playerScores.reduce(
-          (sum, score) => sum + score.gross_score,
-          0
-        ),
+        totalGross,
+        totalPar,
+        toPar: totalGross - totalPar,
       };
     })
     .sort((a, b) => {
       if (a.holesPlayed === 0 && b.holesPlayed > 0) return 1;
       if (a.holesPlayed > 0 && b.holesPlayed === 0) return -1;
-      return a.totalGross - b.totalGross;
+      return a.toPar - b.toPar;
     });
 
   const teamLeaderboard = teamRows
@@ -109,26 +144,41 @@ export default async function LivePage() {
         playerIds.includes(score.player_id)
       );
 
+            const totalGross = teamScores.reduce(
+        (sum, score) => sum + Number(score.gross_score),
+        0
+      );
+
+      const totalPar = teamScores.reduce(
+        (sum, score) => sum + Number(parByHole.get(score.hole_number) ?? 0),
+        0
+      );
+
       return {
         teamId: team.id,
         name: team.name,
         players: playerIds.length,
         scoresEntered: teamScores.length,
-        totalGross: teamScores.reduce(
-          (sum, score) => sum + score.gross_score,
-          0
-        ),
+        totalGross,
+        totalPar,
+        toPar: totalGross - totalPar,
       };
     })
     .sort((a, b) => {
       if (a.scoresEntered === 0 && b.scoresEntered > 0) return 1;
       if (a.scoresEntered > 0 && b.scoresEntered === 0) return -1;
-      return a.totalGross - b.totalGross;
+      return a.toPar - b.toPar;
     });
 
   const currentHole =
     Math.max(1, ...individualLeaderboard.map((player) => player.holesPlayed)) +
     1;
+      const expectedScores = playerRows.length * 18;
+  const progressPercent =
+    expectedScores > 0 ? Math.round((scoreRows.length / expectedScores) * 100) : 0;
+
+  const leadingTeam = teamLeaderboard[0];
+  const leadingPlayer = individualLeaderboard[0];
 
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
@@ -163,13 +213,59 @@ export default async function LivePage() {
 
             <div className="rounded-2xl border border-danvers-border bg-black/20 p-4">
               <p className="text-xs uppercase tracking-[0.25em] text-danvers-muted">
-                Active Matches
+                Progress
               </p>
-              <p className="mt-2 text-4xl font-black">{matchRows.length}</p>
+              <p className="mt-2 text-4xl font-black">{progressPercent}%</p>
             </div>
           </div>
         </div>
+          <div className="mt-6 rounded-2xl border border-danvers-border bg-black/20 p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.25em] text-danvers-muted">
+                  Round Progress
+                </p>
+                <p className="mt-2 text-sm text-danvers-muted">
+                  {scoreRows.length} of {expectedScores} expected scores entered
+                </p>
+              </div>
 
+              <p className="text-2xl font-black">{progressPercent}%</p>
+            </div>
+
+            <div className="mt-4 h-3 overflow-hidden rounded-full bg-black/40">
+              <div
+                className="h-full rounded-full bg-danvers-green"
+                style={{ width: `${Math.min(progressPercent, 100)}%` }}
+              />
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-danvers-border bg-black/20 p-3">
+                <p className="text-xs uppercase tracking-[0.2em] text-danvers-muted">
+                  Leading Team
+                </p>
+                <p className="mt-1 font-black">
+                  {leadingTeam?.name ?? "Pending"}{" "}
+                  {leadingTeam?.scoresEntered > 0
+                    ? `(${formatToPar(leadingTeam.toPar)})`
+                    : ""}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-danvers-border bg-black/20 p-3">
+                <p className="text-xs uppercase tracking-[0.2em] text-danvers-muted">
+                  Individual Leader
+                </p>
+                <p className="mt-1 font-black">
+                  {leadingPlayer?.name ?? "Pending"}{" "}
+                  {leadingPlayer?.holesPlayed > 0
+                    ? `(${formatToPar(leadingPlayer.toPar)})`
+                    : ""}
+                </p>
+              </div>
+            </div>
+          </div>
         <section className="mt-8 grid gap-4 sm:grid-cols-2">
           {teamLeaderboard.map((team, index) => (
             <Link
@@ -192,8 +288,11 @@ export default async function LivePage() {
                 <div className="text-right">
                   <p className="text-sm text-danvers-muted">#{index + 1}</p>
                   <p className="text-3xl font-black">
-                    {team.scoresEntered > 0 ? team.totalGross : "—"}
-                  </p>
+  {team.scoresEntered > 0 ? formatToPar(team.toPar) : "—"}
+</p>
+<p className="text-xs text-danvers-muted">
+  {team.scoresEntered > 0 ? `${team.totalGross} gross` : ""}
+</p>
                 </div>
               </div>
             </Link>
@@ -201,10 +300,21 @@ export default async function LivePage() {
         </section>
 
         <section className="mt-8 rounded-[2rem] border border-danvers-border bg-danvers-surface p-5">
-          <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-brass">
-            Matches
-          </p>
-          <h2 className="mt-2 text-3xl font-black">Current Round</h2>
+          <div className="flex items-end justify-between gap-4">
+  <div>
+    <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-brass">
+      Matches
+    </p>
+    <h2 className="mt-2 text-3xl font-black">Current Round</h2>
+  </div>
+
+  <Link
+    href="/competitions"
+    className="text-sm font-bold text-danvers-muted"
+  >
+    All Events
+  </Link>
+</div>
 
           <div className="mt-5 grid gap-3">
             {matchRows.length ? (
@@ -214,10 +324,11 @@ export default async function LivePage() {
                 );
 
                 return (
-                  <div
-                    key={match.id}
-                    className="rounded-2xl border border-danvers-border bg-black/20 p-4"
-                  >
+                  <Link
+  key={match.id}
+  href={`/matches/${match.id}`}
+  className="block rounded-2xl border border-danvers-border bg-black/20 p-4 transition hover:border-danvers-green"
+>
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-black">
@@ -232,7 +343,7 @@ export default async function LivePage() {
                         {getMatchStatus(holes)}
                       </p>
                     </div>
-                  </div>
+                  </Link>
                 );
               })
             ) : (
@@ -281,15 +392,55 @@ export default async function LivePage() {
                     </div>
                   </div>
 
-                  <p className="text-2xl font-black">
-                    {player.holesPlayed > 0 ? player.totalGross : "—"}
-                  </p>
+                  <div className="text-right">
+  <p className="text-2xl font-black">
+    {player.holesPlayed > 0 ? formatToPar(player.toPar) : "—"}
+  </p>
+  <p className="text-xs text-danvers-muted">
+    {player.holesPlayed > 0 ? `${player.totalGross} gross` : ""}
+  </p>
+</div>
                 </div>
               </Link>
             ))}
           </div>
         </section>
+        <section className="mt-8 rounded-[2rem] border border-danvers-border bg-danvers-surface p-5">
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-brass">
+            Activity Feed
+          </p>
 
+          <h2 className="mt-2 text-3xl font-black">Recent Scores</h2>
+
+          <div className="mt-5 grid gap-3">
+            {recentScores.length ? (
+              recentScores.map((score: any, index) => {
+                const player = playerRows.find(
+                  (p) => p.player_id === score.player_id
+                );
+
+                return (
+                  <div
+                    key={`${score.player_id}-${score.hole_number}-${index}`}
+                    className="rounded-2xl border border-danvers-border bg-black/20 p-4"
+                  >
+                    <p className="font-black">
+                      {player?.players?.full_name ?? "Unknown Player"}
+                    </p>
+
+                    <p className="mt-1 text-sm text-danvers-muted">
+                      Hole {score.hole_number} · Score {score.gross_score}
+                    </p>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="rounded-2xl border border-danvers-border bg-black/20 p-4 text-danvers-muted">
+                No recent score activity.
+              </p>
+            )}
+          </div>
+        </section>
         <Link
           href="/score-entry"
           className="mt-8 block rounded-[2rem] border border-danvers-border bg-danvers-green p-6 text-white transition hover:opacity-90"

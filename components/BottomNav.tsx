@@ -12,11 +12,6 @@ const links = [
     icon: "📅",
   },
   {
-    href: "/competitions",
-    label: "Events",
-    icon: "🎯",
-  },
-  {
     href: "/live",
     label: "Live",
     icon: "⛳",
@@ -25,6 +20,11 @@ const links = [
     href: "/standings",
     label: "Standings",
     icon: "🏆",
+  },
+  {
+    href: "/history",
+    label: "History",
+    icon: "📚",
   },
 ];
 

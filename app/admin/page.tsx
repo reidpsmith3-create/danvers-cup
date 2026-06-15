@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import FinalizeSeasonButton from "@/components/admin/FinalizeSeasonButton";
 
 const adminLinks = [
   {
@@ -28,7 +30,12 @@ const adminLinks = [
   },
 ];
 
-export default function AdminPage() {
+export default async function AdminPage() {
+      const { data: season } = await supabase
+    .from("seasons")
+    .select("*")
+    .eq("year", 2026)
+    .single();
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
       <section className="mx-auto max-w-5xl">
@@ -56,6 +63,11 @@ export default function AdminPage() {
             </Link>
           ))}
         </section>
+                {season ? (
+          <section className="mt-8">
+            <FinalizeSeasonButton seasonId={season.id} />
+          </section>
+        ) : null}
       </section>
     </main>
   );
