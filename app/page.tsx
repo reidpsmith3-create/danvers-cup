@@ -59,7 +59,7 @@ export default async function Home() {
 
       const { data: fieldPlayers } = await supabase
     .from("season_players")
-    .select("players(id, full_name)")
+    .select("players(id, full_name, photo_url)")
     .eq("season_id", season?.id)
     .order("created_at", { ascending: true });
 
@@ -343,9 +343,18 @@ export default async function Home() {
                   href={player?.id ? `/players/${player.id}` : "/players"}
                   className="rounded-3xl border border-white/10 bg-black/25 p-4"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-danvers-gold/30 bg-danvers-gold/10 text-sm font-black text-danvers-gold">
-                    {initials}
-                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-danvers-gold/30 bg-danvers-gold/10 text-sm font-black text-danvers-gold">
+  {player?.photo_url ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={player.photo_url}
+      alt={name}
+      className="h-full w-full object-cover"
+    />
+  ) : (
+    initials
+  )}
+</div>
 
                   <p className="mt-4 text-sm font-black text-white">
                     {name}

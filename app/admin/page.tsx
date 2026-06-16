@@ -8,6 +8,12 @@ const adminLinks = [
     title: "Homepage",
     description: "Edit homepage text, labels, dashboard copy, and feature cards.",
   },
+    {
+    href: "/admin/players",
+    title: "Players",
+    description:
+      "Manage player bios, photos, handicaps, and Danvers Cup profiles.",
+  },
   {
     href: "/admin/rounds",
     title: "Rounds",
