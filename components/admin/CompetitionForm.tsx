@@ -13,39 +13,92 @@ type Round = {
   name: string;
 };
 
+type Competition = {
+  id: string;
+  season_id: string;
+  round_id: string | null;
+  name: string;
+  format: string;
+  scoring_basis: string;
+  handicap_percent: number | null;
+  counts_for_individual_points: boolean | null;
+  counts_for_team_points: boolean | null;
+  is_active: boolean | null;
+  is_visible: boolean | null;
+  settings: {
+    pointsForFirst?: number;
+    pointsForSecond?: number;
+    pointsForThird?: number;
+    pointsForFourth?: number;
+    winPoints?: number;
+    tiePoints?: number;
+    teamScoringMethod?: string;
+  } | null;
+};
+
 export default function CompetitionForm({
   seasonId,
   rounds,
+  competition,
 }: {
   seasonId: string;
   rounds: Round[];
+  competition?: Competition;
 }) {
   const router = useRouter();
 
-  const [name, setName] = useState("");
-  const [roundId, setRoundId] = useState(rounds[0]?.id ?? "");
-  const [format, setFormat] = useState("match");
-  const [scoringBasis, setScoringBasis] = useState("gross");
-  const [handicapPercent, setHandicapPercent] = useState("100");
+  const settings = competition?.settings ?? {};
 
-  const [pointsForFirst, setPointsForFirst] = useState("5");
-  const [pointsForSecond, setPointsForSecond] = useState("3");
-  const [pointsForThird, setPointsForThird] = useState("2");
-  const [pointsForFourth, setPointsForFourth] = useState("1");
+  const [name, setName] = useState(competition?.name ?? "");
+  const [roundId, setRoundId] = useState(
+    competition?.round_id ?? rounds[0]?.id ?? ""
+  );
+  const [format, setFormat] = useState(competition?.format ?? "match");
+  const [scoringBasis, setScoringBasis] = useState(
+    competition?.scoring_basis ?? "gross"
+  );
+  const [handicapPercent, setHandicapPercent] = useState(
+    String(competition?.handicap_percent ?? "100")
+  );
 
-  const [winPoints, setWinPoints] = useState("2");
-  const [tiePoints, setTiePoints] = useState("1");
+  const [pointsForFirst, setPointsForFirst] = useState(
+    String(settings.pointsForFirst ?? "5")
+  );
+  const [pointsForSecond, setPointsForSecond] = useState(
+    String(settings.pointsForSecond ?? "3")
+  );
+  const [pointsForThird, setPointsForThird] = useState(
+    String(settings.pointsForThird ?? "2")
+  );
+  const [pointsForFourth, setPointsForFourth] = useState(
+    String(settings.pointsForFourth ?? "1")
+  );
 
-  const [teamScoringMethod, setTeamScoringMethod] = useState("best_2_total");
+  const [winPoints, setWinPoints] = useState(
+    String(settings.winPoints ?? "2")
+  );
+  const [tiePoints, setTiePoints] = useState(
+    String(settings.tiePoints ?? "1")
+  );
 
-  const [countsForTeamPoints, setCountsForTeamPoints] = useState(true);
-  const [countsForIndividualPoints, setCountsForIndividualPoints] =
-    useState(true);
+  const [teamScoringMethod, setTeamScoringMethod] = useState(
+    settings.teamScoringMethod ?? "best_2_total"
+  );
+
+  const [countsForTeamPoints, setCountsForTeamPoints] = useState(
+    competition?.counts_for_team_points ?? true
+  );
+  const [countsForIndividualPoints, setCountsForIndividualPoints] = useState(
+    competition?.counts_for_individual_points ?? true
+  );
+  const [isActive, setIsActive] = useState(competition?.is_active ?? true);
+  const [isVisible, setIsVisible] = useState(competition?.is_visible ?? true);
 
   const [message, setMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   const scoringRule = getCompetitionScoringRule(format);
+  const isEditing = Boolean(competition?.id);
 
   async function saveCompetition() {
     setIsSaving(true);
@@ -69,12 +122,13 @@ export default function CompetitionForm({
       return;
     }
 
-    const response = await fetch("/api/admin/competitions", {
+    const response = await fetch("/api/admin/competitions/save", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        competitionId: competition?.id ?? null,
         seasonId,
         roundId,
         name: name.trim(),
@@ -83,6 +137,8 @@ export default function CompetitionForm({
         handicapPercent,
         countsForTeamPoints,
         countsForIndividualPoints,
+        isActive,
+        isVisible,
         settings: {
           pointsForFirst: Number(pointsForFirst),
           pointsForSecond: Number(pointsForSecond),
@@ -103,15 +159,21 @@ export default function CompetitionForm({
       return;
     }
 
-    setName("");
     setMessage("Competition saved.");
     setIsSaving(false);
+
+    if (!isEditing) {
+      setName("");
+    }
+
     router.refresh();
   }
 
   return (
     <section className="mt-8 rounded-[2rem] border border-danvers-border bg-danvers-surface p-6">
-      <h2 className="text-2xl font-black">Add Competition</h2>
+      <h2 className="text-2xl font-black">
+        {isEditing ? "Edit Competition" : "Add Competition"}
+      </h2>
 
       <div className="mt-6 grid gap-4">
         <label className="grid gap-2">
@@ -147,10 +209,10 @@ export default function CompetitionForm({
             className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
           >
             {COMPETITION_SCORING_RULES.map((rule) => (
-  <option key={rule.format} value={rule.format}>
-    {rule.label}
-  </option>
-))}
+              <option key={rule.format} value={rule.format}>
+                {rule.label}
+              </option>
+            ))}
           </select>
         </label>
 
@@ -164,11 +226,11 @@ export default function CompetitionForm({
             <p>Uses matches: {scoringRule.usesMatches ? "Yes" : "No"}</p>
             <p>Uses scores: {scoringRule.usesRawScores ? "Yes" : "No"}</p>
             <p>Team points: {scoringRule.supportsTeamPoints ? "Yes" : "No"}</p>
-<p>
-  Individual points:{" "}
-  {scoringRule.supportsIndividualPoints ? "Yes" : "No"}
-</p>
-<p>Calculator: {scoringRule.hasCalculator ? "Yes" : "Manual"}</p>
+            <p>
+              Individual points:{" "}
+              {scoringRule.supportsIndividualPoints ? "Yes" : "No"}
+            </p>
+            <p>Calculator: {scoringRule.hasCalculator ? "Yes" : "Manual"}</p>
           </div>
         </div>
 
@@ -303,6 +365,24 @@ export default function CompetitionForm({
             }
           />
           Counts for individual points
+        </label>
+
+        <label className="flex items-center gap-3 text-sm font-bold">
+          <input
+            type="checkbox"
+            checked={isActive}
+            onChange={(event) => setIsActive(event.target.checked)}
+          />
+          Active
+        </label>
+
+        <label className="flex items-center gap-3 text-sm font-bold">
+          <input
+            type="checkbox"
+            checked={isVisible}
+            onChange={(event) => setIsVisible(event.target.checked)}
+          />
+          Visible
         </label>
 
         <button

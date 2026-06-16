@@ -7,6 +7,8 @@ import CalculateStablefordButton from "@/components/admin/CalculateStablefordBut
 import CalculateStrokeButton from "@/components/admin/CalculateStrokeButton";
 import { getCompetitionScoringRule } from "@/lib/scoring/competitionScoring";
 import { getCompetitionActions } from "@/lib/scoring/getCompetitionActions";
+import { getCurrentSeason } from "@/lib/currentSeason";
+import Link from "next/link";
 import {
   getCompetitionStatus,
   getCompetitionStatusLabel,
@@ -16,11 +18,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function AdminCompetitionsPage() {
-  const { data: season } = await supabase
-    .from("seasons")
-    .select("*")
-    .eq("year", 2026)
-    .single();
+  const season = await getCurrentSeason();
 
   const { data: rounds } = await supabase
     .from("rounds")
@@ -98,6 +96,27 @@ const status = getCompetitionStatus({
   <span className="rounded-full border border-danvers-border px-3 py-1 text-xs font-black uppercase tracking-[0.15em] text-danvers-muted">
     {getCompetitionStatusLabel(status)}
   </span>
+  <div className="mt-2 flex flex-wrap gap-2">
+  {competition.is_active ? (
+    <span className="rounded-full bg-green-600/20 px-2 py-1 text-xs font-bold text-green-400">
+      Active
+    </span>
+  ) : (
+    <span className="rounded-full bg-zinc-600/20 px-2 py-1 text-xs font-bold text-zinc-400">
+      Inactive
+    </span>
+  )}
+
+  {competition.is_visible ? (
+    <span className="rounded-full bg-blue-600/20 px-2 py-1 text-xs font-bold text-blue-400">
+      Visible
+    </span>
+  ) : (
+    <span className="rounded-full bg-yellow-600/20 px-2 py-1 text-xs font-bold text-yellow-400">
+      Hidden
+    </span>
+  )}
+</div>
 </div>
 
       <p className="mt-1 text-sm text-danvers-muted">
@@ -145,11 +164,20 @@ const status = getCompetitionStatus({
         <CalculateStablefordButton competitionId={competition.id} />
       ) : null}
 
-      <DeleteAdminItemButton
-        label="competition"
-        endpoint="/api/admin/competitions/delete"
-        payload={{ competitionId: competition.id }}
-      />
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link
+          href={`/admin/competitions/${competition.id}`}
+          className="rounded-2xl border border-danvers-border px-4 py-3 text-xs font-black uppercase tracking-[0.15em] text-danvers-gold"
+        >
+          Edit Competition
+        </Link>
+
+        <DeleteAdminItemButton
+          label="competition"
+          endpoint="/api/admin/competitions/delete"
+          payload={{ competitionId: competition.id }}
+        />
+      </div>
     </div>
   );
 })
