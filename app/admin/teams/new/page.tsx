@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import CreateTeamForm from "@/components/admin/CreateTeamForm";
 
 export default async function NewTeamPage() {
   const { data: season } = await supabase
@@ -32,45 +33,7 @@ export default async function NewTeamPage() {
           </p>
         </div>
 
-        <form
-          action="/api/admin/teams/create"
-          method="POST"
-          className="mt-6 space-y-6 rounded-[2rem] border border-white/10 bg-danvers-surface/80 p-5"
-        >
-          <input type="hidden" name="seasonId" value={season?.id ?? ""} />
-
-          <div>
-            <label className="text-xs font-bold uppercase tracking-[0.2em] text-danvers-gold">
-              Team Name
-            </label>
-
-            <input
-              name="name"
-              required
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-danvers-gold"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold uppercase tracking-[0.2em] text-danvers-gold">
-              Team Color
-            </label>
-
-            <input
-              name="color"
-              type="color"
-              defaultValue="#1f7a4d"
-              className="mt-2 h-14 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-2"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full rounded-full bg-danvers-gold px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-black"
-          >
-            Create Team
-          </button>
-        </form>
+<CreateTeamForm seasonId={season?.id ?? ""} />
       </section>
     </main>
   );

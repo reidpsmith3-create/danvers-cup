@@ -15,6 +15,16 @@ function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
+function formatDate(date: string | null) {
+  if (!date) return null;
+
+  return new Date(`${date}T12:00:00`).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default async function HistorySeasonPage({
   params,
 }: HistorySeasonPageProps) {
@@ -45,9 +55,16 @@ export default async function HistorySeasonPage({
     .eq("season_id", season.id)
     .maybeSingle();
 
+  const { data: rounds } = await supabase
+    .from("rounds")
+    .select("id, round_number, name, round_date, status, courses(name, city, state)")
+    .eq("season_id", season.id)
+    .order("round_date", { ascending: true })
+    .order("round_number", { ascending: true });
+
   const { data: competitions } = await supabase
     .from("competitions")
-    .select("id, name")
+    .select("id, name, round_id")
     .eq("season_id", season.id)
     .order("created_at", { ascending: true });
 
@@ -76,6 +93,37 @@ export default async function HistorySeasonPage({
     getSingleRelation(seasonResult?.players)?.full_name ??
     "Pending";
 
+  const teamStandingsMap = new Map<string, number>();
+
+  resultRows
+    .filter((result) => result.team_id)
+    .forEach((result) => {
+      const name = getSingleRelation(result.teams)?.name ?? "Unknown Team";
+      const current = teamStandingsMap.get(name) ?? 0;
+
+      teamStandingsMap.set(name, current + Number(result.points ?? 0));
+    });
+
+  const teamStandings: [string, number][] = Array.from(
+    teamStandingsMap.entries()
+  ).sort((a, b) => b[1] - a[1]);
+
+  const individualStandingsMap = new Map<string, number>();
+
+  resultRows
+    .filter((result) => result.player_id)
+    .forEach((result) => {
+      const name =
+        getSingleRelation(result.players)?.full_name ?? "Unknown Player";
+      const current = individualStandingsMap.get(name) ?? 0;
+
+      individualStandingsMap.set(name, current + Number(result.points ?? 0));
+    });
+
+  const individualStandings: [string, number][] = Array.from(
+    individualStandingsMap.entries()
+  ).sort((a, b) => b[1] - a[1]);
+
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
       <section className="mx-auto max-w-5xl">
@@ -86,133 +134,126 @@ export default async function HistorySeasonPage({
           ← Back to History
         </Link>
 
-        <section className="mt-5 relative overflow-hidden rounded-[2rem] border border-danvers-green/40 bg-gradient-to-br from-danvers-surface via-danvers-background to-black p-6 shadow-2xl shadow-black/50">
-          <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-danvers-green/20 blur-3xl" />
-          <div className="absolute -bottom-24 left-6 h-64 w-64 rounded-full bg-danvers-gold/10 blur-3xl" />
+        <section className="mt-5 rounded-[2rem] border border-danvers-green/40 bg-gradient-to-br from-danvers-surface via-danvers-background to-black p-6">
+          <p className="text-sm font-black uppercase tracking-[0.45em] text-danvers-gold">
+            Season Archive
+          </p>
 
-          <div className="relative">
-            <p className="text-sm font-black uppercase tracking-[0.45em] text-danvers-gold">
-              Season Archive
-            </p>
+          <h1 className="mt-4 text-6xl font-black">{season.year}</h1>
 
-            <h1 className="mt-4 text-6xl font-extrabold leading-none tracking-tight">
-              {season.year}
-            </h1>
+          <p className="mt-4 text-sm font-semibold uppercase tracking-[0.22em] text-white/70">
+            {season.location ?? "Location TBD"}
+          </p>
 
-            <p className="mt-4 text-sm font-semibold uppercase tracking-[0.22em] text-white/70">
-              {season.location ?? "Location TBD"}
-            </p>
-
-            <div className="mt-6 grid grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
-                <p className="text-2xl font-black text-white">
-                  {competitions?.length ?? 0}
-                </p>
-                <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.15em] text-danvers-muted">
-                  Events
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
-                <p className="text-2xl font-black text-white">
-                  {resultRows.length}
-                </p>
-                <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.15em] text-danvers-muted">
-                  Results
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
-                <p className="text-2xl font-black text-white">
-                  {season.status}
-                </p>
-                <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.15em] text-danvers-muted">
-                  Status
-                </p>
-              </div>
-            </div>
-          </div>
+          <p className="mt-3 text-sm text-danvers-muted">
+            {formatDate(season.start_date)} — {formatDate(season.end_date)}
+          </p>
         </section>
 
         <section className="mt-8 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-[2rem] border border-danvers-green/30 bg-gradient-to-br from-danvers-green/20 to-black/50 p-6 shadow-xl shadow-black/20">
+          <div className="rounded-[2rem] border border-danvers-green/30 bg-danvers-surface p-6">
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
               Team Champion
             </p>
-
             <h2 className="mt-3 text-3xl font-black">{teamChampion}</h2>
-
             <p className="mt-2 text-sm text-danvers-muted">
               {seasonResult?.team_champion_points ?? "—"} points
             </p>
           </div>
 
-          <div className="rounded-[2rem] border border-danvers-green/30 bg-gradient-to-br from-danvers-green/20 to-black/50 p-6 shadow-xl shadow-black/20">
+          <div className="rounded-[2rem] border border-danvers-green/30 bg-danvers-surface p-6">
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
               Individual Champion
             </p>
-
             <h2 className="mt-3 text-3xl font-black">{individualChampion}</h2>
-
             <p className="mt-2 text-sm text-danvers-muted">
               {seasonResult?.individual_champion_points ?? "—"} points
             </p>
           </div>
         </section>
 
-        <section className="mt-8 rounded-[2rem] border border-white/10 bg-danvers-surface/80 p-6 shadow-xl shadow-black/20">
-          <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
-            Competition Results
-          </p>
+        <section className="mt-8 rounded-[2rem] border border-white/10 bg-danvers-surface p-6">
+          <h2 className="text-3xl font-black">Courses Played</h2>
 
-          <h2 className="mt-2 text-3xl font-black">Official Results</h2>
+          <div className="mt-5 grid gap-3">
+            {rounds?.length ? (
+              rounds.map((round: any) => (
+                <div
+                  key={round.id}
+                  className="rounded-2xl border border-white/10 bg-black/25 p-4"
+                >
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-danvers-gold">
+                    {round.status === "exhibition"
+                      ? "Exhibition"
+                      : `Round ${round.round_number}`}
+                  </p>
 
-          <div className="mt-6 grid gap-4">
-            {competitions?.length ? (
-              competitions.map((competition) => {
-                const competitionResults = resultRows.filter(
-                  (result) => result.competition_id === competition.id
-                );
+                  <h3 className="mt-2 text-xl font-black">{round.name}</h3>
 
-                return (
-                  <div
-                    key={competition.id}
-                    className="rounded-3xl border border-white/10 bg-black/25 p-5"
-                  >
-                    <h3 className="text-xl font-black">{competition.name}</h3>
+                  <p className="mt-1 text-sm text-danvers-muted">
+                    {getSingleRelation(round.courses)?.name ?? "Course TBD"}
+                  </p>
 
-                    <div className="mt-4 grid gap-2">
-                      {competitionResults.length ? (
-                        competitionResults.slice(0, 6).map((result) => (
-                          <div
-                            key={result.id}
-                            className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/25 px-4 py-3"
-                          >
-                            <p className="text-sm font-semibold text-danvers-muted">
-                              {getSingleRelation(result.teams)?.name ??
-                                getSingleRelation(result.players)?.full_name ??
-                                "Result"}
-                            </p>
-
-                            <p className="text-sm font-black text-white">
-                              {result.points} pts
-                            </p>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-danvers-muted">
-                          No official results.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
+                  <p className="mt-1 text-xs text-danvers-muted">
+                    {formatDate(round.round_date)}
+                  </p>
+                </div>
+              ))
             ) : (
-              <p className="text-danvers-muted">
-                No competitions found for this season.
-              </p>
+              <p className="text-danvers-muted">No rounds found.</p>
             )}
+          </div>
+        </section>
+
+        <section className="mt-8 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-[2rem] border border-white/10 bg-danvers-surface p-6">
+            <h2 className="text-3xl font-black">Team Standings</h2>
+
+            <div className="mt-5 grid gap-3">
+              {teamStandings.length ? (
+                teamStandings.map(([name, points], index) => (
+                  <div
+                    key={name}
+                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/25 p-4"
+                  >
+                    <p className="font-black">
+                      {index + 1}. {name}
+                    </p>
+                    <p className="font-black text-danvers-gold">
+                      {points} pts
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-danvers-muted">No team standings found.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/10 bg-danvers-surface p-6">
+            <h2 className="text-3xl font-black">Individual Standings</h2>
+
+            <div className="mt-5 grid gap-3">
+              {individualStandings.length ? (
+                individualStandings.map(([name, points], index) => (
+                  <div
+                    key={name}
+                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/25 p-4"
+                  >
+                    <p className="font-black">
+                      {index + 1}. {name}
+                    </p>
+                    <p className="font-black text-danvers-gold">
+                      {points} pts
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-danvers-muted">
+                  No individual standings found.
+                </p>
+              )}
+            </div>
           </div>
         </section>
       </section>

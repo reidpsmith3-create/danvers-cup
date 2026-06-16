@@ -1,15 +1,19 @@
-import { redirect } from "next/navigation";
+import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
 export async function POST(request: Request) {
-  const formData = await request.formData();
+  const body = await request.json();
 
-  const seasonId = String(formData.get("seasonId") ?? "");
-  const name = String(formData.get("name") ?? "").trim();
-  const color = String(formData.get("color") ?? "#1f7a4d");
+  const seasonId = String(body.seasonId ?? "");
+  const name = String(body.name ?? "").trim();
+  const color = String(body.color ?? "#1f7a4d");
 
-  if (!seasonId || !name) {
-    redirect("/admin/teams");
+  if (!seasonId) {
+    return NextResponse.json({ error: "Missing season ID." }, { status: 400 });
+  }
+
+  if (!name) {
+    return NextResponse.json({ error: "Team name is required." }, { status: 400 });
   }
 
   const { data: team, error } = await supabase
@@ -23,8 +27,11 @@ export async function POST(request: Request) {
     .single();
 
   if (error || !team) {
-    redirect("/admin/teams");
+    return NextResponse.json(
+      { error: error?.message ?? "Team could not be created." },
+      { status: 500 }
+    );
   }
 
-  redirect(`/admin/teams/${team.id}`);
+  return NextResponse.json({ ok: true, teamId: team.id });
 }
