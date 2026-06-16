@@ -25,7 +25,10 @@ function formatTeeTime(time?: string | null) {
     minute: "2-digit",
   });
 }
-
+function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
 export default async function Home() {
   const { data: season } = await supabase
     .from("seasons")
@@ -50,9 +53,15 @@ export default async function Home() {
 
   const { data: rounds } = await supabase
     .from("rounds")
-    .select("*, courses(name, city, state)")
+    .select("id, round_number, name, round_date, tee_time, status, courses(name, city, state)")
     .eq("season_id", season?.id)
     .order("round_number", { ascending: true });
+
+      const { data: fieldPlayers } = await supabase
+    .from("season_players")
+    .select("players(id, full_name)")
+    .eq("season_id", season?.id)
+    .order("created_at", { ascending: true });
 
   const nextRound =
     rounds?.find((round) => round.status === "live") ??
@@ -164,7 +173,11 @@ export default async function Home() {
           </div>
         </section>
 
-        {nextRound && (
+        {nextRound &&
+          (() => {
+            const course = getSingleRelation(nextRound.courses);
+
+            return (
           <section className="mt-6">
             <p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
               {settings?.next_up_label ?? "Next Up"}
@@ -188,10 +201,10 @@ export default async function Home() {
                   <div>
                     <h2 className="text-2xl font-black">{nextRound.name}</h2>
                     <p className="mt-2 text-sm font-medium text-danvers-muted">
-                      {nextRound.courses?.name}
+                      {course?.name}
                     </p>
                     <p className="mt-1 text-sm text-danvers-muted">
-                      {nextRound.courses?.city}, {nextRound.courses?.state}
+                      {course?.city}, {course?.state}
                     </p>
                   </div>
 
@@ -207,7 +220,8 @@ export default async function Home() {
               </div>
             </Link>
           </section>
-        )}
+            );
+          })()}
 
         <section className="mt-6 grid grid-cols-4 gap-3">
           {[
@@ -237,7 +251,7 @@ export default async function Home() {
                   2026 Snapshot
                 </p>
                 <h2 className="mt-3 text-2xl font-black">
-                  Three Days. Three Courses. One Champion.
+                  Three Days. Eight Players. One Cup.
                 </h2>
               </div>
 
@@ -292,62 +306,53 @@ export default async function Home() {
             </div>
           </div>
         </section>
-
-        <section className="mt-10">
-          <div className="mb-5 flex items-end justify-between gap-4">
+        <section className="mt-10 rounded-[2rem] border border-danvers-green/30 bg-gradient-to-br from-danvers-surface to-black/50 p-6 shadow-xl shadow-black/20">
+          <div className="flex items-end justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
-                Schedule
+                The Field
               </p>
-              <h2 className="mt-2 text-3xl font-black">2026 Rounds</h2>
+              <h2 className="mt-2 text-3xl font-black">2026 Players</h2>
             </div>
 
             <Link
-              href="/schedule"
+              href="/players"
               className="text-xs font-bold uppercase tracking-[0.18em] text-danvers-gold"
             >
               View All
             </Link>
           </div>
 
-          <div className="grid gap-4">
-            {rounds?.map((round) => (
-              <article
-                key={round.id}
-                className="overflow-hidden rounded-3xl border border-danvers-green/30 bg-gradient-to-br from-danvers-surface to-black/40 shadow-xl shadow-black/20"
-              >
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="inline-flex rounded-full bg-danvers-green/20 px-3 py-1">
-                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-danvers-gold">
-                          Round {round.round_number}
-                        </p>
-                      </div>
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {fieldPlayers?.map((row) => {
+              const player = Array.isArray(row.players)
+                ? row.players[0]
+                : row.players;
 
-                      <h3 className="mt-4 text-xl font-black">{round.name}</h3>
+              const name = player?.full_name ?? "Player TBD";
+              const initials = name
+                .split(" ")
+                .map((part: string) => part[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase();
 
-                      <p className="mt-2 text-sm font-medium text-danvers-muted">
-                        {round.courses?.name}
-                      </p>
-
-                      <p className="mt-1 text-sm text-danvers-muted">
-                        {round.courses?.city}, {round.courses?.state}
-                      </p>
-                    </div>
-
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-white">
-                        {formatRoundDate(round.round_date)}
-                      </p>
-                      <p className="mt-1 text-sm font-black text-danvers-gold">
-                        {formatTeeTime(round.tee_time)}
-                      </p>
-                    </div>
+              return (
+                <Link
+                  key={player?.id ?? name}
+                  href={player?.id ? `/players/${player.id}` : "/players"}
+                  className="rounded-3xl border border-white/10 bg-black/25 p-4"
+                >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-danvers-gold/30 bg-danvers-gold/10 text-sm font-black text-danvers-gold">
+                    {initials}
                   </div>
-                </div>
-              </article>
-            ))}
+
+                  <p className="mt-4 text-sm font-black text-white">
+                    {name}
+                  </p>
+                </Link>
+              );
+            })}
           </div>
         </section>
 
