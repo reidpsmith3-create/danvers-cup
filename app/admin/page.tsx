@@ -4,11 +4,16 @@ import FinalizeSeasonButton from "@/components/admin/FinalizeSeasonButton";
 
 const adminLinks = [
   {
-  href: "/admin/rounds",
-  title: "Rounds",
-  description: "Set the current round as scheduled, live, or complete.",
-},
-    {
+    href: "/admin/homepage",
+    title: "Homepage",
+    description: "Edit homepage text, labels, dashboard copy, and feature cards.",
+  },
+  {
+    href: "/admin/rounds",
+    title: "Rounds",
+    description: "Set the current round as scheduled, live, or complete.",
+  },
+  {
     href: "/admin/competitions",
     title: "Competitions",
     description: "Create events, formats, scoring settings, and calculators.",
@@ -31,11 +36,12 @@ const adminLinks = [
 ];
 
 export default async function AdminPage() {
-      const { data: season } = await supabase
+  const { data: season } = await supabase
     .from("seasons")
     .select("*")
     .eq("year", 2026)
     .single();
+
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
       <section className="mx-auto max-w-5xl">
@@ -45,7 +51,8 @@ export default async function AdminPage() {
           </p>
           <h1 className="mt-4 text-5xl font-black">Commissioner Tools</h1>
           <p className="mt-3 text-danvers-muted">
-            Manage competitions, matches, scoring, and official results.
+            Manage homepage content, competitions, matches, scoring, and
+            official results.
           </p>
         </div>
 
@@ -63,7 +70,8 @@ export default async function AdminPage() {
             </Link>
           ))}
         </section>
-                {season ? (
+
+        {season ? (
           <section className="mt-8">
             <FinalizeSeasonButton seasonId={season.id} />
           </section>
