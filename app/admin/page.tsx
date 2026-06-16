@@ -30,6 +30,11 @@ const adminLinks = [
     description: "Set the current round as scheduled, live, or complete.",
   },
     {
+    href: "/admin/schedule-events",
+    title: "Trip Events",
+    description: "Add non-golf schedule items like dinners, arrival, and pairings night.",
+  },
+    {
     href: "/admin/courses",
     title: "Courses",
     description: "Manage course names, locations, websites, and logos.",

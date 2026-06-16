@@ -5,7 +5,15 @@ import { getCurrentSeason } from "@/lib/currentSeason";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+function formatDate(dateString: string | null) {
+  if (!dateString) return "Date TBD";
 
+  return new Date(dateString).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 export default async function SchedulePage() {
   const season = await getCurrentSeason();
 
@@ -21,7 +29,13 @@ export default async function SchedulePage() {
     .eq("season_id", season?.id)
     .eq("is_visible", true)
     .order("created_at", { ascending: true });
-
+  const { data: scheduleEvents } = await supabase
+    .from("schedule_events")
+    .select("*")
+    .eq("season_id", season?.id)
+    .eq("is_visible", true)
+    .order("event_date", { ascending: true })
+    .order("event_time", { ascending: true });
   const competitionsByRoundId = ((competitions as any[]) ?? []).reduce(
     (acc, competition) => {
       if (!acc[competition.round_id]) {
@@ -145,6 +159,65 @@ export default async function SchedulePage() {
               </article>
             );
           })}
+        </section>
+                <section className="mt-10">
+          <div className="mb-5">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-brass">
+              Trip Schedule
+            </p>
+            <h2 className="mt-2 text-3xl font-black">Non-Golf Events</h2>
+          </div>
+
+          <div className="grid gap-4">
+            {scheduleEvents?.length ? (
+              scheduleEvents.map((event: any) => (
+                <article
+                  key={event.id}
+                  className="rounded-3xl border border-danvers-border bg-danvers-surface p-5"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-danvers-brass">
+                        {event.event_type}
+                      </p>
+
+                      <h3 className="mt-2 text-2xl font-black">
+                        {event.title}
+                      </h3>
+
+                      {event.description ? (
+                        <p className="mt-2 whitespace-pre-line text-sm leading-6 text-danvers-muted">
+  {event.description}
+</p>
+                      ) : null}
+
+                      <p className="mt-3 text-sm text-danvers-muted">
+                        {event.location ?? "Location TBD"}
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="font-bold">
+                       {formatDate(event.event_date)}
+                      </p>
+
+                      <p className="mt-1 text-lg font-black text-danvers-text">
+                        {event.event_time
+  ? event.event_time.slice(0, 5)
+  : "Time TBD"}
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div className="rounded-3xl border border-danvers-border bg-danvers-surface p-6">
+                <p className="text-danvers-muted">
+                  No non-golf trip events have been added yet.
+                </p>
+              </div>
+            )}
+          </div>
         </section>
       </section>
     </main>
