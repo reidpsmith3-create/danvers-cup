@@ -1,6 +1,7 @@
 import Link from "next/link";
 import MatchHoleForm from "@/components/admin/MatchHoleForm";
 import { supabase } from "@/lib/supabase";
+import { getCurrentSeason } from "@/lib/currentSeason";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -44,11 +45,7 @@ export default async function MatchDetailPage({
     .eq("id", params.id)
     .single();
 
-  const { data: season } = await supabase
-    .from("seasons")
-    .select("*")
-    .eq("year", 2026)
-    .single();
+  const season = await getCurrentSeason();
 
   const { data: seasonPlayers } = await supabase
     .from("season_players")
@@ -86,17 +83,26 @@ export default async function MatchDetailPage({
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
       <section className="mx-auto max-w-5xl">
-        <Link
-          href="/admin/matches"
-          className="text-sm font-bold text-danvers-muted"
-        >
-          ← Back to Matches
-        </Link>
+<div className="flex items-center justify-between gap-4">
+  <Link
+    href="/admin/matches"
+    className="text-xs font-bold uppercase tracking-[0.2em] text-danvers-gold"
+  >
+    ← Matches
+  </Link>
+
+  <Link
+    href={`/matches/${match.id}`}
+    className="text-xs font-bold uppercase tracking-[0.2em] text-danvers-muted"
+  >
+    Public View
+  </Link>
+</div>
 
         <div className="mt-5 rounded-[2rem] border border-danvers-border bg-danvers-surface p-6">
-          <p className="text-xs font-bold uppercase tracking-[0.35em] text-danvers-brass">
-            Match Scoring
-          </p>
+<p className="text-xs font-bold uppercase tracking-[0.35em] text-danvers-brass">
+  Admin Match Scoring
+</p>
 
           <h1 className="mt-4 text-5xl font-black">
             {match.team_a_name} vs {match.team_b_name}
@@ -135,21 +141,33 @@ export default async function MatchDetailPage({
           </div>
         </div>
 
-        <section className="mt-8 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-[2rem] border border-danvers-border bg-danvers-surface p-6">
-            <h2 className="text-2xl font-black">{match.team_a_name}</h2>
-            <p className="mt-3 text-danvers-muted">
-              {playerNames(match.team_a_player_ids ?? [], players)}
-            </p>
-          </div>
+<section className="mt-8 grid gap-4 sm:grid-cols-2">
+  <div className="rounded-[2rem] border border-danvers-border bg-danvers-surface p-6">
+    <p className="text-xs font-bold uppercase tracking-[0.25em] text-danvers-brass">
+      Side A
+    </p>
+    <h2 className="mt-2 text-2xl font-black">{match.team_a_name}</h2>
+    <p className="mt-3 leading-6 text-danvers-muted">
+      {playerNames(match.team_a_player_ids ?? [], players)}
+    </p>
+    <p className="mt-3 text-xs font-bold uppercase tracking-[0.2em] text-danvers-muted">
+      {(match.team_a_player_ids ?? []).length} player(s)
+    </p>
+  </div>
 
-          <div className="rounded-[2rem] border border-danvers-border bg-danvers-surface p-6">
-            <h2 className="text-2xl font-black">{match.team_b_name}</h2>
-            <p className="mt-3 text-danvers-muted">
-              {playerNames(match.team_b_player_ids ?? [], players)}
-            </p>
-          </div>
-        </section>
+  <div className="rounded-[2rem] border border-danvers-border bg-danvers-surface p-6">
+    <p className="text-xs font-bold uppercase tracking-[0.25em] text-danvers-brass">
+      Side B
+    </p>
+    <h2 className="mt-2 text-2xl font-black">{match.team_b_name}</h2>
+    <p className="mt-3 leading-6 text-danvers-muted">
+      {playerNames(match.team_b_player_ids ?? [], players)}
+    </p>
+    <p className="mt-3 text-xs font-bold uppercase tracking-[0.2em] text-danvers-muted">
+      {(match.team_b_player_ids ?? []).length} player(s)
+    </p>
+  </div>
+</section>
 
         <MatchHoleForm matchId={match.id} existingHoles={savedHoles} />
       </section>

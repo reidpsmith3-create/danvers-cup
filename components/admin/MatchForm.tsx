@@ -1,7 +1,7 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 
 type Competition = {
   id: string;
@@ -19,14 +19,21 @@ type Player = {
   full_name: string;
 };
 
+type TeamMember = {
+  team_id: string;
+  player_id: string;
+};
+
 export default function MatchForm({
   competitions,
   teams,
   players,
+  teamMembers,
 }: {
   competitions: Competition[];
   teams: Team[];
   players: Player[];
+  teamMembers: TeamMember[];
 }) {
   const router = useRouter();
 
@@ -45,6 +52,40 @@ export default function MatchForm({
     (competition) => competition.id === competitionId
   );
 
+  const playersById = useMemo(() => {
+    return new Map(players.map((player) => [player.id, player]));
+  }, [players]);
+
+  const teamAPlayers = useMemo(() => {
+    return teamMembers
+      .filter((member) => member.team_id === teamAId)
+      .map((member) => playersById.get(member.player_id))
+      .filter(Boolean) as Player[];
+  }, [teamAId, teamMembers, playersById]);
+
+  const teamBPlayers = useMemo(() => {
+    return teamMembers
+      .filter((member) => member.team_id === teamBId)
+      .map((member) => playersById.get(member.player_id))
+      .filter(Boolean) as Player[];
+  }, [teamBId, teamMembers, playersById]);
+
+  useEffect(() => {
+    setTeamAPlayerIds((current) =>
+      current.filter((playerId) =>
+        teamAPlayers.some((player) => player.id === playerId)
+      )
+    );
+  }, [teamAPlayers]);
+
+  useEffect(() => {
+    setTeamBPlayerIds((current) =>
+      current.filter((playerId) =>
+        teamBPlayers.some((player) => player.id === playerId)
+      )
+    );
+  }, [teamBPlayers]);
+
   const showMatchPlayWarning =
     selectedCompetition?.format === "match" &&
     (teamAPlayerIds.length > 1 || teamBPlayerIds.length > 1);
@@ -56,14 +97,12 @@ export default function MatchForm({
           ? current.filter((id) => id !== playerId)
           : [...current, playerId]
       );
-      setTeamBPlayerIds((current) => current.filter((id) => id !== playerId));
     } else {
       setTeamBPlayerIds((current) =>
         current.includes(playerId)
           ? current.filter((id) => id !== playerId)
           : [...current, playerId]
       );
-      setTeamAPlayerIds((current) => current.filter((id) => id !== playerId));
     }
   }
 
@@ -71,8 +110,20 @@ export default function MatchForm({
     setIsSaving(true);
     setMessage("");
 
+    if (!competitionId) {
+      setMessage("Choose a competition.");
+      setIsSaving(false);
+      return;
+    }
+
     if (teamAId === teamBId) {
       setMessage("Choose two different teams.");
+      setIsSaving(false);
+      return;
+    }
+
+    if (!teamAPlayerIds.length || !teamBPlayerIds.length) {
+      setMessage("Each side needs at least one player.");
       setIsSaving(false);
       return;
     }
@@ -170,50 +221,70 @@ export default function MatchForm({
           <div className="rounded-3xl border border-danvers-border bg-black/20 p-4">
             <h3 className="font-black">{teamAName}</h3>
 
-            <div className="mt-4 grid gap-2">
-              {players.map((player) => {
-                const selected = teamAPlayerIds.includes(player.id);
+            <p className="mt-1 text-sm text-danvers-muted">
+              {teamAPlayers.length} rostered players
+            </p>
 
-                return (
-                  <button
-                    key={player.id}
-                    type="button"
-                    onClick={() => togglePlayer("A", player.id)}
-                    className={`rounded-xl border px-3 py-2 text-left text-sm font-bold ${
-                      selected
-                        ? "border-danvers-green bg-danvers-green text-white"
-                        : "border-danvers-border bg-black/20 text-danvers-muted"
-                    }`}
-                  >
-                    {player.full_name}
-                  </button>
-                );
-              })}
+            <div className="mt-4 grid gap-2">
+              {teamAPlayers.length ? (
+                teamAPlayers.map((player) => {
+                  const selected = teamAPlayerIds.includes(player.id);
+
+                  return (
+                    <button
+                      key={player.id}
+                      type="button"
+                      onClick={() => togglePlayer("A", player.id)}
+                      className={`rounded-xl border px-3 py-2 text-left text-sm font-bold ${
+                        selected
+                          ? "border-danvers-green bg-danvers-green text-white"
+                          : "border-danvers-border bg-black/20 text-danvers-muted"
+                      }`}
+                    >
+                      {player.full_name}
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="rounded-xl border border-danvers-border bg-black/20 p-3 text-sm text-danvers-muted">
+                  No players assigned to this team.
+                </p>
+              )}
             </div>
           </div>
 
           <div className="rounded-3xl border border-danvers-border bg-black/20 p-4">
             <h3 className="font-black">{teamBName}</h3>
 
-            <div className="mt-4 grid gap-2">
-              {players.map((player) => {
-                const selected = teamBPlayerIds.includes(player.id);
+            <p className="mt-1 text-sm text-danvers-muted">
+              {teamBPlayers.length} rostered players
+            </p>
 
-                return (
-                  <button
-                    key={player.id}
-                    type="button"
-                    onClick={() => togglePlayer("B", player.id)}
-                    className={`rounded-xl border px-3 py-2 text-left text-sm font-bold ${
-                      selected
-                        ? "border-danvers-green bg-danvers-green text-white"
-                        : "border-danvers-border bg-black/20 text-danvers-muted"
-                    }`}
-                  >
-                    {player.full_name}
-                  </button>
-                );
-              })}
+            <div className="mt-4 grid gap-2">
+              {teamBPlayers.length ? (
+                teamBPlayers.map((player) => {
+                  const selected = teamBPlayerIds.includes(player.id);
+
+                  return (
+                    <button
+                      key={player.id}
+                      type="button"
+                      onClick={() => togglePlayer("B", player.id)}
+                      className={`rounded-xl border px-3 py-2 text-left text-sm font-bold ${
+                        selected
+                          ? "border-danvers-green bg-danvers-green text-white"
+                          : "border-danvers-border bg-black/20 text-danvers-muted"
+                      }`}
+                    >
+                      {player.full_name}
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="rounded-xl border border-danvers-border bg-black/20 p-3 text-sm text-danvers-muted">
+                  No players assigned to this team.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -229,7 +300,7 @@ export default function MatchForm({
         <button
           type="button"
           onClick={saveMatch}
-          disabled={isSaving}
+          disabled={isSaving || competitions.length === 0 || teams.length < 2}
           className="rounded-2xl bg-danvers-green px-5 py-4 text-sm font-black text-white disabled:opacity-50"
         >
           {isSaving ? "Saving..." : "Save Match"}
