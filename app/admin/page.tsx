@@ -29,6 +29,11 @@ const adminLinks = [
     title: "Rounds",
     description: "Set the current round as scheduled, live, or complete.",
   },
+    {
+    href: "/admin/courses",
+    title: "Courses",
+    description: "Manage course names, locations, websites, and logos.",
+  },
   {
     href: "/admin/competitions",
     title: "Competitions",
