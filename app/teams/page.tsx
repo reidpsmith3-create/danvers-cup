@@ -42,8 +42,10 @@ export default async function TeamsPage() {
   const { data: season } = await supabase
     .from("seasons")
     .select("*")
-    .eq("year", 2026)
-    .single();
+    .in("status", ["upcoming", "active"])
+    .order("year", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   const { data: teamsData } = await supabase
     .from("teams")
@@ -53,13 +55,16 @@ export default async function TeamsPage() {
 
   const teams = (teamsData as TeamRow[] | null) ?? [];
 
-  const { data: membersData } = await supabase
-    .from("team_members")
-    .select("team_id, players(id, full_name, photo_url)")
-    .in(
-      "team_id",
-      teams.map((team) => team.id)
-    );
+  const { data: membersData } =
+    teams.length > 0
+      ? await supabase
+          .from("team_members")
+          .select("team_id, players(id, full_name, photo_url)")
+          .in(
+            "team_id",
+            teams.map((team) => team.id)
+          )
+      : { data: [] };
 
   const membersByTeamId = new Map<string, TeamMemberRow[]>();
 

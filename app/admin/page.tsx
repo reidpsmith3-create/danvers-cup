@@ -15,6 +15,11 @@ const adminLinks = [
       "Manage player bios, photos, handicaps, and Danvers Cup profiles.",
   },
   {
+  href: "/admin/teams",
+  title: "Teams",
+  description: "Manage yearly teams, logos, colors, and roster assignments.",
+},
+  {
     href: "/admin/rounds",
     title: "Rounds",
     description: "Set the current round as scheduled, live, or complete.",
