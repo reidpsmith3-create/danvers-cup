@@ -24,6 +24,38 @@ function formatDate(date: string | null) {
     year: "numeric",
   });
 }
+function getCompetitionForRound(roundId: string, competitions: any[]) {
+  return competitions.find((competition) => competition.round_id === roundId);
+}
+function get2024Record(name: string) {
+  const records: Record<string, string> = {
+    American: "6-4-1",
+    National: "4-6-1",
+    "Neil Birky": "3-0-1",
+    "Taylor Marvin": "3-1-0",
+    "Ryan Smith": "2-1-1",
+    "Reid Smith": "2-2-0",
+    "Jeff Freitag": "2-0-0",
+    "Dusty Hayes": "1-3-0",
+    "Mike Rodriguez": "1-3-0",
+    "Scottie The Doctor": "1-1-0",
+    "Mitch Birky": "0-4-0",
+  };
+
+  return records[name] ?? null;
+}
+
+function getSeasonRecap(year: number) {
+  if (year !== 2024) return null;
+
+  return `The inaugural Danvers Cup was held in Phoenix, Arizona from November 10-14, 2024.
+
+The American Team captured the first team championship, finishing with 6.5 points to National's 4.5.
+
+Neil Birky won the first individual title with 3.5 points, holding off Taylor Marvin and Ryan Smith.
+
+Four official competitions were contested at Ak-Chin Southern Dunes and TPC Scottsdale Stadium Course, with an exhibition round at We-Ko-Pa Saguaro.`;
+}
 
 export default async function HistorySeasonPage({
   params,
@@ -171,34 +203,82 @@ export default async function HistorySeasonPage({
             </p>
           </div>
         </section>
+                {getSeasonRecap(season.year) ? (
+          <section className="mt-8 rounded-[2rem] border border-white/10 bg-danvers-surface p-6">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
+              Season Recap
+            </p>
+
+            <h2 className="mt-2 text-3xl font-black">The Story</h2>
+
+            <p className="mt-4 whitespace-pre-line text-sm leading-7 text-danvers-muted">
+              {getSeasonRecap(season.year)}
+            </p>
+          </section>
+        ) : null}
 
         <section className="mt-8 rounded-[2rem] border border-white/10 bg-danvers-surface p-6">
           <h2 className="text-3xl font-black">Courses Played</h2>
 
           <div className="mt-5 grid gap-3">
             {rounds?.length ? (
-              rounds.map((round: any) => (
-                <div
-                  key={round.id}
-                  className="rounded-2xl border border-white/10 bg-black/25 p-4"
-                >
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-danvers-gold">
-                    {round.status === "exhibition"
-                      ? "Exhibition"
-                      : `Round ${round.round_number}`}
-                  </p>
+              rounds.map((round: any) => {
+                const competition = getCompetitionForRound(
+                  round.id,
+                  (competitions as any[]) ?? []
+                );
 
-                  <h3 className="mt-2 text-xl font-black">{round.name}</h3>
+                const cardClassName =
+                  "block rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-danvers-gold";
 
-                  <p className="mt-1 text-sm text-danvers-muted">
-                    {getSingleRelation(round.courses)?.name ?? "Course TBD"}
-                  </p>
+                const cardContent = (
+                  <>
+                    <p className="text-xs font-bold uppercase tracking-[0.25em] text-danvers-gold">
+                      {round.status === "exhibition"
+                        ? "Exhibition"
+                        : `Round ${round.round_number}`}
+                    </p>
 
-                  <p className="mt-1 text-xs text-danvers-muted">
-                    {formatDate(round.round_date)}
-                  </p>
-                </div>
-              ))
+                    <h3 className="mt-2 text-xl font-black">{round.name}</h3>
+
+                    <p className="mt-1 text-sm text-danvers-muted">
+                      {getSingleRelation(round.courses)?.name ?? "Course TBD"}
+                    </p>
+
+                    <p className="mt-1 text-xs text-danvers-muted">
+                      {formatDate(round.round_date)}
+                    </p>
+
+                    {competition ? (
+                      <p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-danvers-gold">
+                        View Competition →
+                      </p>
+                    ) : (
+                      <p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-danvers-muted">
+                        Exhibition / No standings
+                      </p>
+                    )}
+                  </>
+                );
+
+                if (competition) {
+                  return (
+                    <Link
+                      key={round.id}
+                      href={`/history/${season.year}/competitions/${competition.id}`}
+                      className={cardClassName}
+                    >
+                      {cardContent}
+                    </Link>
+                  );
+                }
+
+                return (
+                  <div key={round.id} className={cardClassName}>
+                    {cardContent}
+                  </div>
+                );
+              })
             ) : (
               <p className="text-danvers-muted">No rounds found.</p>
             )}
@@ -219,9 +299,14 @@ export default async function HistorySeasonPage({
                     <p className="font-black">
                       {index + 1}. {name}
                     </p>
-                    <p className="font-black text-danvers-gold">
-                      {points} pts
-                    </p>
+<div className="text-right">
+  <p className="font-black text-danvers-gold">{points} pts</p>
+  {get2024Record(name) ? (
+    <p className="mt-1 text-xs text-danvers-muted">
+      {get2024Record(name)}
+    </p>
+  ) : null}
+</div>
                   </div>
                 ))
               ) : (
@@ -243,9 +328,14 @@ export default async function HistorySeasonPage({
                     <p className="font-black">
                       {index + 1}. {name}
                     </p>
-                    <p className="font-black text-danvers-gold">
-                      {points} pts
-                    </p>
+<div className="text-right">
+  <p className="font-black text-danvers-gold">{points} pts</p>
+  {get2024Record(name) ? (
+    <p className="mt-1 text-xs text-danvers-muted">
+      {get2024Record(name)}
+    </p>
+  ) : null}
+</div>
                   </div>
                 ))
               ) : (
