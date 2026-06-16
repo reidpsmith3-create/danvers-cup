@@ -13,6 +13,11 @@ const adminLinks = [
   title: "Seasons",
   description: "Create and manage yearly Danvers Cup seasons.",
 },
+  {
+    href: "/admin/site-health",
+    title: "Site Health",
+    description: "Check whether the current season is ready for the trip.",
+  },
     {
     href: "/admin/players",
     title: "Players",
