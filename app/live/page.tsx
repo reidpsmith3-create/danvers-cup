@@ -32,7 +32,9 @@ export default async function LivePage() {
   const { data: competitions } = await supabase
     .from("competitions")
     .select("id, name, format, round_id")
-    .eq("round_id", round?.id);
+    .eq("round_id", round?.id)
+    .eq("is_active", true)
+    .eq("is_visible", true);
 
   const competitionIds = competitions?.map((competition) => competition.id) ?? [];
 
@@ -62,9 +64,15 @@ export default async function LivePage() {
     .select("id, name, color")
     .eq("season_id", season?.id);
 
-  const { data: teamMembers } = await supabase
-    .from("team_members")
-    .select("team_id, player_id");
+  const teamIds = teams?.map((team) => team.id) ?? [];
+
+  const { data: teamMembers } =
+    teamIds.length > 0
+      ? await supabase
+          .from("team_members")
+          .select("team_id, player_id")
+          .in("team_id", teamIds)
+      : { data: [] };
 
   const { data: scores } = round
     ? await supabase
@@ -176,6 +184,33 @@ export default async function LivePage() {
 
   const leadingTeam = teamLeaderboard[0];
   const leadingPlayer = individualLeaderboard[0];
+
+  if (!round) {
+    return (
+      <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
+        <section className="mx-auto max-w-5xl">
+          <div className="rounded-[2rem] border border-danvers-border bg-danvers-surface p-6">
+            <p className="text-xs font-bold uppercase tracking-[0.35em] text-danvers-brass">
+              Game Center
+            </p>
+
+            <h1 className="mt-4 text-5xl font-black">Live</h1>
+
+            <p className="mt-3 text-danvers-muted">
+              No live or scheduled round found.
+            </p>
+
+            <Link
+              href="/admin/rounds"
+              className="mt-5 inline-flex rounded-full bg-danvers-gold px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-black"
+            >
+              Manage Rounds
+            </Link>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">

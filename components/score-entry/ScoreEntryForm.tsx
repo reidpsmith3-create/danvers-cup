@@ -23,13 +23,7 @@ export default function ScoreEntryForm({
   players,
 }: ScoreEntryFormProps) {
   const [holeNumber, setHoleNumber] = useState(1);
-  const [scores, setScores] = useState<ScoreState[]>(
-    players.map((player) => ({
-      playerId: player.playerId,
-      playerName: player.playerName,
-      grossScore: 4,
-    }))
-  );
+  const [scores, setScores] = useState<ScoreState[]>([]);
   const [isLoadingScores, setIsLoadingScores] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -81,6 +75,19 @@ export default function ScoreEntryForm({
     );
   }
 
+  function setScore(playerId: string, grossScore: number) {
+    setScores((current) =>
+      current.map((score) =>
+        score.playerId === playerId
+          ? {
+              ...score,
+              grossScore,
+            }
+          : score
+      )
+    );
+  }
+
   async function saveHole() {
     setIsSaving(true);
     setMessage("");
@@ -117,34 +124,38 @@ export default function ScoreEntryForm({
     setHoleNumber(Math.min(18, Math.max(1, nextHole)));
   }
 
+  const totalToPar = scores.reduce((total, score) => {
+    return total + (score.grossScore - 4);
+  }, 0);
+
   return (
     <>
-      <section className="mt-8 rounded-[2rem] border border-danvers-border bg-black/20 p-5">
-        <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-brass">
+      <section className="sticky top-0 z-30 mt-6 rounded-[2rem] border border-danvers-green/30 bg-danvers-surface/95 p-5 shadow-2xl shadow-black/40 backdrop-blur-xl">
+        <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
           Current Hole
         </p>
 
-        <div className="mt-4 flex items-end justify-between">
+        <div className="mt-4 flex items-end justify-between gap-4">
           <div>
-            <p className="text-7xl font-black">{holeNumber}</p>
-            <p className="mt-2 text-danvers-muted">
+            <p className="text-7xl font-black leading-none">{holeNumber}</p>
+            <p className="mt-2 text-sm text-danvers-muted">
               {isLoadingScores
                 ? "Loading saved scores..."
-                : "Hole-by-hole gross score entry"}
+                : `${scores.length} players · Group total ${totalToPar >= 0 ? "+" : ""}${totalToPar}`}
             </p>
           </div>
 
           <button
             type="button"
             onClick={saveHole}
-            disabled={isSaving || isLoadingScores}
-            className="rounded-2xl bg-danvers-green px-5 py-3 text-sm font-black text-white disabled:opacity-50"
+            disabled={isSaving || isLoadingScores || scores.length === 0}
+            className="rounded-2xl bg-danvers-green px-5 py-4 text-sm font-black text-white disabled:opacity-50"
           >
-            {isSaving ? "Saving..." : "Save Hole"}
+            {isSaving ? "Saving..." : "Save"}
           </button>
         </div>
 
-        <div className="mt-5 grid grid-cols-6 gap-2 sm:grid-cols-9">
+        <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
           {Array.from({ length: 18 }).map((_, index) => {
             const hole = index + 1;
             const isActive = hole === holeNumber;
@@ -154,10 +165,10 @@ export default function ScoreEntryForm({
                 key={hole}
                 type="button"
                 onClick={() => goToHole(hole)}
-                className={`rounded-xl px-3 py-2 text-sm font-black ${
+                className={`flex h-10 min-w-10 items-center justify-center rounded-xl text-sm font-black ${
                   isActive
                     ? "bg-danvers-green text-white"
-                    : "border border-danvers-border bg-danvers-surface text-danvers-muted"
+                    : "border border-danvers-border bg-black/20 text-danvers-muted"
                 }`}
               >
                 {hole}
@@ -179,10 +190,12 @@ export default function ScoreEntryForm({
             key={score.playerId}
             className="rounded-3xl border border-danvers-border bg-danvers-surface p-5"
           >
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-black">{score.playerName}</h2>
-                <p className="mt-1 text-sm text-danvers-muted">Gross score</p>
+                <p className="mt-1 text-sm text-danvers-muted">
+                  Gross {score.grossScore}
+                </p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -190,12 +203,12 @@ export default function ScoreEntryForm({
                   type="button"
                   onClick={() => updateScore(score.playerId, -1)}
                   disabled={isLoadingScores}
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl border border-danvers-border text-xl font-black disabled:opacity-50"
+                  className="flex h-12 w-12 items-center justify-center rounded-2xl border border-danvers-border text-2xl font-black disabled:opacity-50"
                 >
                   −
                 </button>
 
-                <div className="flex h-12 w-14 items-center justify-center rounded-2xl bg-black/30 text-2xl font-black">
+                <div className="flex h-14 w-16 items-center justify-center rounded-2xl bg-black/30 text-3xl font-black">
                   {score.grossScore}
                 </div>
 
@@ -203,11 +216,29 @@ export default function ScoreEntryForm({
                   type="button"
                   onClick={() => updateScore(score.playerId, 1)}
                   disabled={isLoadingScores}
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl border border-danvers-border text-xl font-black disabled:opacity-50"
+                  className="flex h-12 w-12 items-center justify-center rounded-2xl border border-danvers-border text-2xl font-black disabled:opacity-50"
                 >
                   +
                 </button>
               </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-5 gap-2">
+              {[3, 4, 5, 6, 7].map((quickScore) => (
+                <button
+                  key={quickScore}
+                  type="button"
+                  onClick={() => setScore(score.playerId, quickScore)}
+                  disabled={isLoadingScores}
+                  className={`rounded-xl border px-3 py-2 text-sm font-black disabled:opacity-50 ${
+                    score.grossScore === quickScore
+                      ? "border-danvers-gold bg-danvers-gold/20 text-danvers-gold"
+                      : "border-danvers-border bg-black/20 text-danvers-muted"
+                  }`}
+                >
+                  {quickScore}
+                </button>
+              ))}
             </div>
           </div>
         ))}
