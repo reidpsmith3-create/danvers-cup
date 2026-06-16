@@ -1,6 +1,7 @@
 import Link from "next/link";
 import TeamForm from "@/components/admin/TeamForm";
 import { supabase } from "@/lib/supabase";
+import { getCurrentSeason } from "@/lib/currentSeason";
 
 type AdminTeamEditPageProps = {
   params: {
@@ -42,11 +43,7 @@ export default async function AdminTeamEditPage({
     .eq("id", params.id)
     .single();
 
-  const { data: season } = await supabase
-    .from("seasons")
-    .select("*")
-    .eq("year", 2026)
-    .single();
+  const season = await getCurrentSeason();
 
   const { data: seasonPlayers } = await supabase
     .from("season_players")

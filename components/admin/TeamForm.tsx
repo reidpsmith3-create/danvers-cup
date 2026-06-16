@@ -108,7 +108,34 @@ export default function TeamForm({
 
     setSaving(false);
   }
+  async function handleDelete() {
+    const confirmed = window.confirm(
+      `Delete ${team.name}? This will remove the team and its roster assignments.`
+    );
 
+    if (!confirmed) return;
+
+    setSaving(true);
+    setMessage("");
+
+    const response = await fetch("/api/admin/teams/delete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ teamId: team.id }),
+    });
+
+    if (!response.ok) {
+      const result = await response.json();
+      setMessage(result.error ?? "Something went wrong deleting the team.");
+      setSaving(false);
+      return;
+    }
+
+    router.push("/admin/teams");
+    router.refresh();
+  }
   return (
     <form
       onSubmit={(event) => {
@@ -215,7 +242,23 @@ export default function TeamForm({
       >
         {saving ? "Saving..." : "Save Team"}
       </button>
+      <section className="rounded-[2rem] border border-red-500/30 bg-red-500/10 p-5">
+        <h2 className="text-2xl font-black text-red-200">Danger Zone</h2>
 
+        <p className="mt-2 text-sm leading-6 text-red-100/80">
+          Delete this team and remove its roster assignments. This cannot be
+          undone.
+        </p>
+
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={saving}
+          className="mt-4 w-full rounded-full border border-red-400/40 px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-red-200 disabled:opacity-60"
+        >
+          Delete Team
+        </button>
+      </section>
       {message ? (
         <p className="text-center text-sm font-semibold text-danvers-muted">
           {message}

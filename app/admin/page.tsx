@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 import FinalizeSeasonButton from "@/components/admin/FinalizeSeasonButton";
+import { getCurrentSeason } from "@/lib/currentSeason";
 
 const adminLinks = [
   {
@@ -8,6 +8,11 @@ const adminLinks = [
     title: "Homepage",
     description: "Edit homepage text, labels, dashboard copy, and feature cards.",
   },
+  {
+  href: "/admin/seasons",
+  title: "Seasons",
+  description: "Create and manage yearly Danvers Cup seasons.",
+},
     {
     href: "/admin/players",
     title: "Players",
@@ -47,11 +52,7 @@ const adminLinks = [
 ];
 
 export default async function AdminPage() {
-  const { data: season } = await supabase
-    .from("seasons")
-    .select("*")
-    .eq("year", 2026)
-    .single();
+  const season = await getCurrentSeason();
 
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">

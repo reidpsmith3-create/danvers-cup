@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import ScoreEntryForm from "@/components/score-entry/ScoreEntryForm";
 import { getCurrentRound } from "@/lib/rounds/getCurrentRound";
+import { getCurrentSeason } from "@/lib/currentSeason";
 
 type ScoreEntryPageProps = {
   searchParams?: {
@@ -16,11 +17,7 @@ export default async function ScoreEntryPage({
   ? Number(searchParams.round)
   : null;
 
-  const { data: season } = await supabase
-    .from("seasons")
-    .select("*")
-    .eq("year", 2026)
-    .single();
+  const season = await getCurrentSeason();
 
   const { data: rounds } = await supabase
     .from("rounds")

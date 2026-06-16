@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getCurrentRound } from "@/lib/rounds/getCurrentRound";
+import { getCurrentSeason } from "@/lib/currentSeason";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,11 +25,7 @@ function getMatchStatus(holes: any[]) {
 }
 
 export default async function LivePage() {
-  const { data: season } = await supabase
-    .from("seasons")
-    .select("*")
-    .eq("year", 2026)
-    .single();
+  const season = await getCurrentSeason();
 
   const round = season ? await getCurrentRound(season.id) : null;
 

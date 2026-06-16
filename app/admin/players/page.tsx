@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { getCurrentSeason } from "@/lib/currentSeason";
 
 type SeasonPlayerRow = {
   id: string;
@@ -29,11 +30,7 @@ function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
 }
 
 export default async function AdminPlayersPage() {
-  const { data: season } = await supabase
-    .from("seasons")
-    .select("*")
-    .eq("year", 2026)
-    .single();
+  const season = await getCurrentSeason();
 
   const { data: seasonPlayers } = await supabase
     .from("season_players")

@@ -1,16 +1,13 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getCompetitionScoringRule } from "@/lib/scoring/competitionScoring";
+import { getCurrentSeason } from "@/lib/currentSeason";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function SchedulePage() {
-  const { data: season } = await supabase
-    .from("seasons")
-    .select("*")
-    .eq("year", 2026)
-    .single();
+  const season = await getCurrentSeason();
 
   const { data: rounds } = await supabase
     .from("rounds")
