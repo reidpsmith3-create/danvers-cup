@@ -11,18 +11,36 @@ type CompetitionPageProps = {
   };
 };
 
-function getMatchStatus(holes: any[]) {
-  const teamAWins = holes.filter((hole) => hole.winning_side === "team_a").length;
-  const teamBWins = holes.filter((hole) => hole.winning_side === "team_b").length;
+function getMatchStatus(
+  holes: any[],
+  sideAName: string,
+  sideBName: string
+) {
+  const teamAWins = holes.filter(
+    (hole) => hole.winning_side === "team_a"
+  ).length;
+
+  const teamBWins = holes.filter(
+    (hole) => hole.winning_side === "team_b"
+  ).length;
+
   const margin = Math.abs(teamAWins - teamBWins);
 
-  if (margin === 0) return "All Square";
+  if (margin === 0) {
+    return "All Square";
+  }
 
   return teamAWins > teamBWins
-    ? `Team A ${margin} Up`
-    : `Team B ${margin} Up`;
+    ? `${sideAName} ${margin} Up`
+    : `${sideBName} ${margin} Up`;
 }
+function playerNames(ids: string[], players: any[]) {
+  const names = ids
+    .map((id) => players.find((player) => player.id === id)?.full_name)
+    .filter(Boolean);
 
+  return names.length ? names.join(" / ") : null;
+}
 export default async function CompetitionPage({ params }: CompetitionPageProps) {
   const { data: competition } = await supabase
     .from("competitions")
@@ -57,7 +75,17 @@ export default async function CompetitionPage({ params }: CompetitionPageProps) 
     .select("*")
     .eq("competition_id", competition.id)
     .order("created_at", { ascending: true });
+const { data: seasonPlayers } = await supabase
+  .from("season_players")
+  .select("player_id, players(id, full_name)")
+  .eq("season_id", competition.season_id)
+  .order("created_at", { ascending: true });
 
+const players =
+  seasonPlayers?.map((row: any) => ({
+    id: row.player_id,
+    full_name: row.players?.full_name ?? "Unknown Player",
+  })) ?? [];
   const matchIds = matches?.map((match) => match.id) ?? [];
 
   const { data: matchHoles } =
@@ -186,20 +214,35 @@ export default async function CompetitionPage({ params }: CompetitionPageProps) 
                   (hole) => hole.match_id === match.id
                 );
 
-                return (
-                  <Link
-  key={match.id}
-  href={`/matches/${match.id}`}
-  className="block rounded-2xl border border-danvers-border bg-black/20 p-4 transition hover:border-danvers-green"
->
-                    <p className="font-black">
-                      {match.team_a_name} vs {match.team_b_name}
-                    </p>
-                    <p className="mt-1 text-sm text-danvers-muted">
-                      {getMatchStatus(holes)} · {holes.length} holes scored
-                    </p>
-                  </Link>
-                );
+const sideAPlayers =
+  playerNames(match.team_a_player_ids ?? [], players) ??
+  match.team_a_name ??
+  "Side A";
+
+const sideBPlayers =
+  playerNames(match.team_b_player_ids ?? [], players) ??
+  match.team_b_name ??
+  "Side B";
+
+return (
+  <Link
+    key={match.id}
+    href={`/matches/${match.id}`}
+    className="block rounded-2xl border border-danvers-border bg-black/20 p-4 transition hover:border-danvers-green"
+  >
+    <p className="font-black">
+      {sideAPlayers} vs {sideBPlayers}
+    </p>
+
+    <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-danvers-brass">
+      {match.team_a_name ?? "Team A"} vs {match.team_b_name ?? "Team B"}
+    </p>
+
+    <p className="mt-1 text-sm text-danvers-muted">
+      {getMatchStatus(holes, sideAPlayers, sideBPlayers)} · {holes.length} holes scored
+    </p>
+  </Link>
+);
               })}
             </div>
           </section>

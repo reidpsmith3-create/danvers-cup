@@ -41,7 +41,7 @@ export default async function MatchDetailPage({
 }: MatchDetailPageProps) {
   const { data: match } = await supabase
     .from("matches")
-    .select("*, competitions(name, format)")
+    .select("*, competitions(name, format, settings)")
     .eq("id", params.id)
     .single();
 
@@ -65,9 +65,9 @@ export default async function MatchDetailPage({
     .eq("match_id", params.id)
     .order("hole_number", { ascending: true });
 
-  const savedHoles = (holes as any[]) ?? [];
+const savedHoles = (holes as any[]) ?? [];
 
-  if (!match) {
+if (!match) {
     return (
       <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
         <section className="mx-auto max-w-4xl">
@@ -79,6 +79,14 @@ export default async function MatchDetailPage({
       </main>
     );
   }
+  const competitionSettings = match.competitions?.settings ?? {};
+const holeCount = Number(competitionSettings.holeCount ?? 18);
+const nineType = competitionSettings.nineType ?? null;
+
+const holeNumbers =
+  holeCount === 9 && nineType === "back"
+    ? Array.from({ length: 9 }, (_, index) => index + 10)
+    : Array.from({ length: holeCount }, (_, index) => index + 1);
 
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
@@ -135,7 +143,7 @@ export default async function MatchDetailPage({
                 Remaining
               </p>
               <p className="mt-2 text-2xl font-black">
-                {18 - savedHoles.length}
+                {holeNumbers.length - savedHoles.length}
               </p>
             </div>
           </div>
@@ -169,7 +177,11 @@ export default async function MatchDetailPage({
   </div>
 </section>
 
-        <MatchHoleForm matchId={match.id} existingHoles={savedHoles} />
+        <MatchHoleForm
+  matchId={match.id}
+  existingHoles={savedHoles}
+  holeNumbers={holeNumbers}
+/>
       </section>
     </main>
   );

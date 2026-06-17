@@ -24,13 +24,13 @@ function formatDate(date: string | null) {
     year: "numeric",
   });
 }
-function getCompetitionForRound(roundId: string, competitions: any[]) {
-  return competitions.find((competition) => competition.round_id === roundId);
+function getCompetitionsForRound(roundId: string, competitions: any[]) {
+  return competitions.filter((competition) => competition.round_id === roundId);
 }
 function get2024Record(name: string) {
   const records: Record<string, string> = {
-    American: "6-4-1",
-    National: "4-6-1",
+American: "7-4-1",
+National: "4-7-1",
     "Neil Birky": "3-0-1",
     "Taylor Marvin": "3-1-0",
     "Ryan Smith": "2-1-1",
@@ -222,63 +222,47 @@ export default async function HistorySeasonPage({
 
           <div className="mt-5 grid gap-3">
             {rounds?.length ? (
-              rounds.map((round: any) => {
-                const competition = getCompetitionForRound(
-                  round.id,
-                  (competitions as any[]) ?? []
-                );
+rounds.map((round: any) => {
+  const roundCompetitions = getCompetitionsForRound(
+    round.id,
+    (competitions as any[]) ?? []
+  );
 
-                const cardClassName =
-                  "block rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-danvers-gold";
+  const cardClassName =
+    "block rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-danvers-gold";
 
-                const cardContent = (
-                  <>
-                    <p className="text-xs font-bold uppercase tracking-[0.25em] text-danvers-gold">
-                      {round.status === "exhibition"
-                        ? "Exhibition"
-                        : `Round ${round.round_number}`}
-                    </p>
+  return (
+    <Link
+      key={round.id}
+      href={`/history/${season.year}/rounds/${round.id}`}
+      className={cardClassName}
+    >
+      <p className="text-xs font-bold uppercase tracking-[0.25em] text-danvers-gold">
+        {round.status === "exhibition"
+          ? "Exhibition"
+          : `Round ${round.round_number}`}
+      </p>
 
-                    <h3 className="mt-2 text-xl font-black">{round.name}</h3>
+      <h3 className="mt-2 text-xl font-black">{round.name}</h3>
 
-                    <p className="mt-1 text-sm text-danvers-muted">
-                      {getSingleRelation(round.courses)?.name ?? "Course TBD"}
-                    </p>
+      <p className="mt-1 text-sm text-danvers-muted">
+        {getSingleRelation(round.courses)?.name ?? "Course TBD"}
+      </p>
 
-                    <p className="mt-1 text-xs text-danvers-muted">
-                      {formatDate(round.round_date)}
-                    </p>
+      <p className="mt-1 text-xs text-danvers-muted">
+        {formatDate(round.round_date)}
+      </p>
 
-                    {competition ? (
-                      <p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-danvers-gold">
-                        View Competition →
-                      </p>
-                    ) : (
-                      <p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-danvers-muted">
-                        Exhibition / No standings
-                      </p>
-                    )}
-                  </>
-                );
-
-                if (competition) {
-                  return (
-                    <Link
-                      key={round.id}
-                      href={`/history/${season.year}/competitions/${competition.id}`}
-                      className={cardClassName}
-                    >
-                      {cardContent}
-                    </Link>
-                  );
-                }
-
-                return (
-                  <div key={round.id} className={cardClassName}>
-                    {cardContent}
-                  </div>
-                );
-              })
+      <p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-danvers-gold">
+        {roundCompetitions.length
+          ? `${roundCompetitions.length} Competition${
+              roundCompetitions.length === 1 ? "" : "s"
+            } →`
+          : "View Round →"}
+      </p>
+    </Link>
+  );
+})
             ) : (
               <p className="text-danvers-muted">No rounds found.</p>
             )}

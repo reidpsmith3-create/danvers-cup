@@ -2,6 +2,7 @@ import ResultsForm from "@/components/admin/ResultsForm";
 import DeleteResultButton from "@/components/admin/DeleteResultButton";
 import { supabase } from "@/lib/supabase";
 import { getCurrentSeason } from "@/lib/currentSeason";
+import FinalizeCompetitionResultsButton from "@/components/admin/FinalizeCompetitionResultsButton";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -15,6 +16,20 @@ export default async function AdminResultsPage() {
     .eq("season_id", season?.id)
     .order("created_at", { ascending: true });
 
+  const competitionIds = competitions?.map((competition) => competition.id) ?? [];
+
+  const { data: matches } =
+    competitionIds.length > 0
+      ? await supabase
+          .from("matches")
+          .select("id, competition_id")
+          .in("competition_id", competitionIds)
+      : { data: [] };
+
+  const competitionsWithMatches = new Set(
+    ((matches as any[]) ?? []).map((match) => match.competition_id)
+  );
+
   const { data: teams } = await supabase
     .from("teams")
     .select("*")
@@ -27,13 +42,17 @@ export default async function AdminResultsPage() {
     .eq("season_id", season?.id)
     .order("created_at", { ascending: true });
 
-  const { data: results } = await supabase
-    .from("competition_results")
-    .select(
-      "id, points, result_label, is_official, team_id, player_id, competitions(name), teams(name), players(full_name)"
-    )
-    .eq("is_official", true)
-    .order("created_at", { ascending: false });
+  const { data: results } =
+    competitionIds.length > 0
+      ? await supabase
+          .from("competition_results")
+          .select(
+            "id, competition_id, points, result_label, is_official, team_id, player_id, competitions(name), teams(name), players(full_name)"
+          )
+          .in("competition_id", competitionIds)
+          .eq("is_official", true)
+          .order("created_at", { ascending: false })
+      : { data: [] };
 
   const groupedResults = ((results as any[]) ?? []).reduce((acc, result) => {
     const competitionName = result.competitions?.name ?? "Competition";
@@ -67,50 +86,64 @@ export default async function AdminResultsPage() {
           <div className="mt-5 grid gap-6">
             {Object.entries(groupedResults).length ? (
               (Object.entries(groupedResults) as [string, any[]][]).map(
-  ([competitionName, rows]) => (
-                <details
-  key={competitionName}
-  className="rounded-3xl border border-danvers-border bg-black/20 p-4"
->
-  <summary className="cursor-pointer list-none">
-    <div className="flex items-center justify-between gap-4">
-      <div>
-        <h3 className="text-xl font-black">{competitionName}</h3>
-        <p className="mt-1 text-sm text-danvers-muted">
-          {rows.length} official result(s)
-        </p>
-      </div>
+                ([competitionName, rows]) => {
+                  const competitionId = rows[0].competition_id;
+                  const hasMatches = competitionsWithMatches.has(competitionId);
 
-      <span className="text-sm font-black text-danvers-muted">
-        Expand
-      </span>
-    </div>
-  </summary>
+                  return (
+                    <details
+                      key={competitionName}
+                      className="rounded-3xl border border-danvers-border bg-black/20 p-4"
+                    >
+                      <summary className="cursor-pointer list-none">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <h3 className="text-xl font-black">
+                              {competitionName}
+                            </h3>
 
-  <div className="mt-4 grid gap-3">
-                    {rows.map((result: any) => (
-                      <div
-                        key={result.id}
-                        className="rounded-2xl border border-danvers-border bg-black/20 p-4"
-                      >
-                        <p className="font-black">
-                          {result.teams?.name ??
-                            result.players?.full_name ??
-                            "Unknown"}{" "}
-                          · {result.points} point(s)
-                        </p>
+                            <p className="mt-1 text-sm text-danvers-muted">
+                              {rows.length} official result(s)
+                            </p>
 
-                        <p className="mt-1 text-xs text-danvers-muted">
-                          {result.result_label ?? "No label"}
-                        </p>
+                            {hasMatches ? (
+                              <FinalizeCompetitionResultsButton
+                                competitionId={competitionId}
+                              />
+                            ) : null}
+                          </div>
 
-                        <DeleteResultButton resultId={result.id} />
+                          <span className="text-sm font-black text-danvers-muted">
+                            Expand
+                          </span>
+                        </div>
+                      </summary>
+
+                      <div className="mt-4 grid gap-3">
+                        {rows.map((result: any) => (
+                          <div
+                            key={result.id}
+                            className="rounded-2xl border border-danvers-border bg-black/20 p-4"
+                          >
+                            <p className="font-black">
+                              {result.teams?.name ??
+                                result.players?.full_name ??
+                                "Unknown"}{" "}
+                              · {result.points} point(s)
+                            </p>
+
+                            <p className="mt-1 text-xs text-danvers-muted">
+                              {result.result_label ?? "No label"}
+                            </p>
+
+                            <DeleteResultButton resultId={result.id} />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </details>
-                )
-)
+                    </details>
+                  );
+                }
+              )
             ) : (
               <p className="text-danvers-muted">
                 No official results entered yet.
@@ -118,7 +151,33 @@ export default async function AdminResultsPage() {
             )}
           </div>
         </section>
+<section className="mt-8 rounded-[2rem] border border-danvers-border bg-danvers-surface p-6">
+  <h2 className="text-2xl font-black">Finalize Match Competitions</h2>
 
+  <p className="mt-2 text-sm leading-6 text-danvers-muted">
+    Use this after match holes have been scored. It will calculate official team
+    and individual points from saved match results.
+  </p>
+
+  <div className="mt-5 grid gap-3">
+    {((competitions as any[]) ?? [])
+      .filter((competition) => competitionsWithMatches.has(competition.id))
+      .map((competition) => (
+        <div
+          key={competition.id}
+          className="rounded-3xl border border-danvers-border bg-black/20 p-5"
+        >
+          <h3 className="text-xl font-black">{competition.name}</h3>
+
+          <p className="mt-1 text-sm text-danvers-muted">
+            Match-based competition
+          </p>
+
+          <FinalizeCompetitionResultsButton competitionId={competition.id} />
+        </div>
+      ))}
+  </div>
+</section>
         <ResultsForm
           competitions={(competitions as any[]) ?? []}
           teams={(teams as any[]) ?? []}

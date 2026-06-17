@@ -18,11 +18,13 @@ function formatWinningSide(value: string) {
 export default function MatchHoleForm({
   matchId,
   existingHoles,
+  holeNumbers,
 }: {
   matchId: string;
   existingHoles: MatchHole[];
+  holeNumbers: number[];
 }) {
-  const [holeNumber, setHoleNumber] = useState(1);
+  const [holeNumber, setHoleNumber] = useState(holeNumbers[0] ?? 1);
   const [winningSide, setWinningSide] = useState("halved");
   const [teamAScore, setTeamAScore] = useState("");
   const [teamBScore, setTeamBScore] = useState("");
@@ -78,8 +80,9 @@ export default function MatchHoleForm({
 
     setMessage(`Hole ${holeNumber} saved.`);
 
-    const nextHole = Math.min(18, holeNumber + 1);
-    chooseHole(nextHole);
+    const currentIndex = holeNumbers.indexOf(holeNumber);
+const nextHole = holeNumbers[Math.min(currentIndex + 1, holeNumbers.length - 1)];
+chooseHole(nextHole);
 
     setIsSaving(false);
   }
@@ -95,7 +98,7 @@ export default function MatchHoleForm({
           </p>
           <h2 className="mt-2 text-3xl font-black">Score Match Hole</h2>
           <p className="mt-2 text-sm text-danvers-muted">
-            {savedCount} of 18 holes saved.
+            {savedCount} of {holeNumbers.length} holes saved.
           </p>
         </div>
 
@@ -110,8 +113,7 @@ export default function MatchHoleForm({
       </div>
 
       <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
-        {Array.from({ length: 18 }).map((_, index) => {
-          const hole = index + 1;
+        {holeNumbers.map((hole) => {
           const isActive = hole === holeNumber;
           const isSaved = existingHoleByNumber.has(hole);
 

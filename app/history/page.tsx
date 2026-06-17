@@ -270,19 +270,25 @@ export default async function HistoryPage() {
           </div>
         </section>
 
-        <section className="mt-8 rounded-[2rem] border border-white/10 bg-danvers-surface/80 p-6 shadow-xl shadow-black/20">
-          <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
-            Records
-          </p>
+<Link
+  href="/history/records"
+  className="mt-8 block rounded-[2rem] border border-white/10 bg-danvers-surface/80 p-6 shadow-xl shadow-black/20 transition hover:border-danvers-gold"
+>
+  <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
+    Records
+  </p>
 
-          <h2 className="mt-3 text-3xl font-black">Record Book Coming Soon</h2>
+  <h2 className="mt-3 text-3xl font-black">Record Book</h2>
 
-          <p className="mt-3 text-sm leading-6 text-danvers-muted">
-            Most points, most appearances, most team titles, individual titles,
-            match records, and course records will live here as the archive
-            grows.
-          </p>
-        </section>
+  <p className="mt-3 text-sm leading-6 text-danvers-muted">
+    Most points, appearances, titles, match records, and Danvers Cup career
+    leaders.
+  </p>
+
+  <p className="mt-5 text-xs font-black uppercase tracking-[0.18em] text-danvers-gold">
+    View Records →
+  </p>
+</Link>
       </section>
     </main>
   );

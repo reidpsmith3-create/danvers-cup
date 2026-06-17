@@ -33,6 +33,8 @@ type Competition = {
     winPoints?: number;
     tiePoints?: number;
     teamScoringMethod?: string;
+holeCount?: number;
+nineType?: string | null;
   } | null;
 };
 
@@ -84,7 +86,13 @@ export default function CompetitionForm({
   const [teamScoringMethod, setTeamScoringMethod] = useState(
     settings.teamScoringMethod ?? "best_2_total"
   );
+const [holeCount, setHoleCount] = useState(
+  String(settings.holeCount ?? "18")
+);
 
+const [nineType, setNineType] = useState(
+  settings.nineType ?? "front"
+);
   const [countsForTeamPoints, setCountsForTeamPoints] = useState(
     competition?.counts_for_team_points ?? true
   );
@@ -147,6 +155,8 @@ export default function CompetitionForm({
           winPoints: Number(winPoints),
           tiePoints: Number(tiePoints),
           teamScoringMethod,
+holeCount: Number(holeCount),
+nineType: holeCount === "9" ? nineType : null,
         },
       }),
     });
@@ -248,7 +258,37 @@ export default function CompetitionForm({
             <option value="both">Both</option>
           </select>
         </label>
+<div className="grid gap-4 sm:grid-cols-2">
+  <label className="grid gap-2">
+    <span className="text-sm font-bold text-danvers-muted">
+      Holes
+    </span>
+    <select
+      value={holeCount}
+      onChange={(event) => setHoleCount(event.target.value)}
+      className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+    >
+      <option value="18">18 holes</option>
+      <option value="9">9 holes</option>
+    </select>
+  </label>
 
+  {holeCount === "9" ? (
+    <label className="grid gap-2">
+      <span className="text-sm font-bold text-danvers-muted">
+        Nine
+      </span>
+      <select
+        value={nineType}
+        onChange={(event) => setNineType(event.target.value)}
+        className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+      >
+        <option value="front">Front 9</option>
+        <option value="back">Back 9</option>
+      </select>
+    </label>
+  ) : null}
+</div>
         <label className="grid gap-2">
           <span className="text-sm font-bold text-danvers-muted">
             Handicap %
