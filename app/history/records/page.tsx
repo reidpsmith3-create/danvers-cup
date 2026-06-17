@@ -4,6 +4,13 @@ import { supabase } from "@/lib/supabase";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+type RecordRow = {
+  id: string;
+  name: string;
+  value: string | number;
+  href?: string;
+};
+
 function formatPoints(points: number) {
   return Number.isInteger(points) ? String(points) : points.toFixed(1);
 }
@@ -13,10 +20,29 @@ function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
+function getWinPercentage(record: {
+  wins: number;
+  losses: number;
+  ties: number;
+}) {
+  const total = record.wins + record.losses + record.ties;
+  if (!total) return 0;
+
+  return ((record.wins + record.ties * 0.5) / total) * 100;
+}
+
 function buildMatchRecords(matches: any[]) {
   const records = new Map<
     string,
-    { playerId: string; name: string; wins: number; losses: number; ties: number }
+    {
+      playerId: string;
+      name: string;
+      wins: number;
+      losses: number;
+      ties: number;
+      singlesWins: number;
+      unbeatenStreak: number;
+    }
   >();
 
   function ensurePlayer(player: any) {
@@ -29,40 +55,87 @@ function buildMatchRecords(matches: any[]) {
         wins: 0,
         losses: 0,
         ties: 0,
+        singlesWins: 0,
+        unbeatenStreak: 0,
       });
     }
 
     return records.get(player.id) ?? null;
   }
 
+  const matchesByPlayer = new Map<string, string[]>();
+
   matches.forEach((match) => {
     const sideAPlayers = match.team_a_players ?? [];
     const sideBPlayers = match.team_b_players ?? [];
+
+    const isSingles =
+      match.match_type === "singles" ||
+      (sideAPlayers.length === 1 && sideBPlayers.length === 1);
 
     sideAPlayers.forEach((player: any) => {
       const record = ensurePlayer(player);
       if (!record) return;
 
-      if (match.winning_side === "halved") record.ties += 1;
-      else if (match.winning_side === "team_a") record.wins += 1;
-      else if (match.winning_side === "team_b") record.losses += 1;
+      let result = "L";
+
+      if (match.winning_side === "halved") {
+        record.ties += 1;
+        result = "T";
+      } else if (match.winning_side === "team_a") {
+        record.wins += 1;
+        result = "W";
+        if (isSingles) record.singlesWins += 1;
+      } else if (match.winning_side === "team_b") {
+        record.losses += 1;
+        result = "L";
+      }
+
+      if (!matchesByPlayer.has(player.id)) matchesByPlayer.set(player.id, []);
+      matchesByPlayer.get(player.id)?.push(result);
     });
 
     sideBPlayers.forEach((player: any) => {
       const record = ensurePlayer(player);
       if (!record) return;
 
-      if (match.winning_side === "halved") record.ties += 1;
-      else if (match.winning_side === "team_b") record.wins += 1;
-      else if (match.winning_side === "team_a") record.losses += 1;
+      let result = "L";
+
+      if (match.winning_side === "halved") {
+        record.ties += 1;
+        result = "T";
+      } else if (match.winning_side === "team_b") {
+        record.wins += 1;
+        result = "W";
+        if (isSingles) record.singlesWins += 1;
+      } else if (match.winning_side === "team_a") {
+        record.losses += 1;
+        result = "L";
+      }
+
+      if (!matchesByPlayer.has(player.id)) matchesByPlayer.set(player.id, []);
+      matchesByPlayer.get(player.id)?.push(result);
     });
   });
 
-  return Array.from(records.values()).sort((a, b) => {
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    if (a.losses !== b.losses) return a.losses - b.losses;
-    return b.ties - a.ties;
+  records.forEach((record) => {
+    const results = matchesByPlayer.get(record.playerId) ?? [];
+    let current = 0;
+    let best = 0;
+
+    results.forEach((result) => {
+      if (result === "W" || result === "T") {
+        current += 1;
+        best = Math.max(best, current);
+      } else {
+        current = 0;
+      }
+    });
+
+    record.unbeatenStreak = best;
   });
+
+  return Array.from(records.values());
 }
 
 function RecordSection({
@@ -73,7 +146,7 @@ function RecordSection({
 }: {
   title: string;
   subtitle: string;
-  rows: { id: string; name: string; value: string | number; href?: string }[];
+  rows: RecordRow[];
   valueLabel?: string;
 }) {
   return (
@@ -89,11 +162,9 @@ function RecordSection({
           rows.map((row, index) => {
             const content = (
               <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-black/25 p-4">
-                <div>
-                  <p className="font-black">
-                    {index + 1}. {row.name}
-                  </p>
-                </div>
+                <p className="font-black">
+                  {index + 1}. {row.name}
+                </p>
 
                 <p className="text-right font-black text-danvers-gold">
                   {row.value}
@@ -138,7 +209,9 @@ export default async function RecordsPage() {
 
   const { data: competitionResults } = await supabase
     .from("competition_results")
-    .select("player_id, points, players(id, full_name)")
+    .select(
+      "player_id, points, players(id, full_name), competitions(name, is_visible, seasons(year))"
+    )
     .not("player_id", "is", null)
     .eq("is_official", true);
 
@@ -154,16 +227,39 @@ export default async function RecordsPage() {
   const { data: matches } = await supabase
     .from("matches")
     .select(
-      "id, team_a_player_ids, team_b_player_ids, winning_side, is_official"
+      "id, team_a_player_ids, team_b_player_ids, winning_side, match_type, is_official, competitions(is_visible, rounds(round_date))"
     )
     .eq("is_official", true);
 
   const playerRows = (players as any[]) ?? [];
   const playerById = new Map(playerRows.map((player) => [player.id, player]));
 
+  const visibleCompetitionResults = ((competitionResults as any[]) ?? []).filter(
+    (result) => {
+      const competition = getSingleRelation(result.competitions);
+      return competition?.is_visible !== false;
+    }
+  );
+
+  const visibleMatches = ((matches as any[]) ?? [])
+    .filter((match) => {
+      const competition = getSingleRelation(match.competitions);
+      return competition?.is_visible !== false;
+    })
+    .sort((a, b) => {
+      const competitionA = getSingleRelation(a.competitions);
+      const competitionB = getSingleRelation(b.competitions);
+      const roundA = getSingleRelation(competitionA?.rounds);
+      const roundB = getSingleRelation(competitionB?.rounds);
+
+      return String(roundA?.round_date ?? "").localeCompare(
+        String(roundB?.round_date ?? "")
+      );
+    });
+
   const careerPointsMap = new Map<string, number>();
 
-  ((competitionResults as any[]) ?? []).forEach((result) => {
+  visibleCompetitionResults.forEach((result) => {
     if (!result.player_id) return;
 
     careerPointsMap.set(
@@ -253,7 +349,7 @@ export default async function RecordsPage() {
     .sort((a, b) => Number(b.value) - Number(a.value))
     .slice(0, 10);
 
-  const officialMatchesWithPlayers = ((matches as any[]) ?? []).map((match) => ({
+  const officialMatchesWithPlayers = visibleMatches.map((match) => ({
     ...match,
     team_a_players: (match.team_a_player_ids ?? [])
       .map((playerId: string) => playerById.get(playerId))
@@ -263,13 +359,110 @@ export default async function RecordsPage() {
       .filter(Boolean),
   }));
 
-  const bestMatchRecords = buildMatchRecords(officialMatchesWithPlayers)
+  const matchRecords = buildMatchRecords(officialMatchesWithPlayers);
+
+  const bestMatchRecords = [...matchRecords]
+    .sort((a, b) => {
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      if (a.losses !== b.losses) return a.losses - b.losses;
+      return b.ties - a.ties;
+    })
     .map((record) => ({
       id: record.playerId,
       name: record.name,
       value: `${record.wins}-${record.losses}-${record.ties}`,
       href: `/players/${record.playerId}`,
     }))
+    .slice(0, 10);
+
+  const bestWinPercentage = [...matchRecords]
+    .filter((record) => record.wins + record.losses + record.ties >= 2)
+    .sort((a, b) => getWinPercentage(b) - getWinPercentage(a))
+    .map((record) => ({
+      id: record.playerId,
+      name: record.name,
+      value: `${getWinPercentage(record).toFixed(1)}%`,
+      href: `/players/${record.playerId}`,
+    }))
+    .slice(0, 10);
+
+  const mostMatchWins = [...matchRecords]
+    .sort((a, b) => b.wins - a.wins)
+    .map((record) => ({
+      id: record.playerId,
+      name: record.name,
+      value: record.wins,
+      href: `/players/${record.playerId}`,
+    }))
+    .slice(0, 10);
+
+  const mostSinglesWins = [...matchRecords]
+    .sort((a, b) => b.singlesWins - a.singlesWins)
+    .map((record) => ({
+      id: record.playerId,
+      name: record.name,
+      value: record.singlesWins,
+      href: `/players/${record.playerId}`,
+    }))
+    .slice(0, 10);
+
+  const longestUnbeatenStreaks = [...matchRecords]
+    .sort((a, b) => b.unbeatenStreak - a.unbeatenStreak)
+    .map((record) => ({
+      id: record.playerId,
+      name: record.name,
+      value: record.unbeatenStreak,
+      href: `/players/${record.playerId}`,
+    }))
+    .slice(0, 10);
+
+  const seasonPointMap = new Map<
+    string,
+    { playerId: string; name: string; year: number | null; points: number }
+  >();
+
+  visibleCompetitionResults.forEach((result) => {
+    if (!result.player_id) return;
+
+    const competition = getSingleRelation(result.competitions);
+    const season = getSingleRelation(competition?.seasons);
+    const key = `${result.player_id}-${season?.year ?? "unknown"}`;
+
+    const current = seasonPointMap.get(key) ?? {
+      playerId: result.player_id,
+      name: playerById.get(result.player_id)?.full_name ?? "Unknown Player",
+      year: season?.year ?? null,
+      points: 0,
+    };
+
+    current.points += Number(result.points ?? 0);
+    seasonPointMap.set(key, current);
+  });
+
+  const bestSingleSeasons = Array.from(seasonPointMap.values())
+    .sort((a, b) => b.points - a.points)
+    .map((row) => ({
+      id: `${row.playerId}-${row.year}`,
+      name: `${row.name}${row.year ? ` (${row.year})` : ""}`,
+      value: formatPoints(row.points),
+      href: `/players/${row.playerId}`,
+    }))
+    .slice(0, 10);
+
+  const bestSingleCompetitions = visibleCompetitionResults
+    .map((result) => {
+      const competition = getSingleRelation(result.competitions);
+
+      return {
+        id: `${result.player_id}-${competition?.name ?? "competition"}`,
+        name: `${playerById.get(result.player_id)?.full_name ?? "Unknown Player"} · ${
+          competition?.name ?? "Competition"
+        }`,
+        value: formatPoints(Number(result.points ?? 0)),
+        href: `/players/${result.player_id}`,
+      };
+    })
+    .sort((a, b) => Number(b.value) - Number(a.value))
     .slice(0, 10);
 
   return (
@@ -304,6 +497,20 @@ export default async function RecordsPage() {
           />
 
           <RecordSection
+            title="Best Single Season"
+            subtitle="Season Records"
+            rows={bestSingleSeasons}
+            valueLabel="pts"
+          />
+
+          <RecordSection
+            title="Best Single Competition"
+            subtitle="Competition Records"
+            rows={bestSingleCompetitions}
+            valueLabel="pts"
+          />
+
+          <RecordSection
             title="Most Appearances"
             subtitle="Longevity"
             rows={mostAppearances}
@@ -325,6 +532,30 @@ export default async function RecordsPage() {
             title="Best Match Records"
             subtitle="Match Play"
             rows={bestMatchRecords}
+          />
+
+          <RecordSection
+            title="Best Match Win %"
+            subtitle="Match Play"
+            rows={bestWinPercentage}
+          />
+
+          <RecordSection
+            title="Most Match Wins"
+            subtitle="Match Play"
+            rows={mostMatchWins}
+          />
+
+          <RecordSection
+            title="Most Singles Wins"
+            subtitle="Match Play"
+            rows={mostSinglesWins}
+          />
+
+          <RecordSection
+            title="Longest Unbeaten Streak"
+            subtitle="Match Play"
+            rows={longestUnbeatenStreaks}
           />
         </section>
       </section>

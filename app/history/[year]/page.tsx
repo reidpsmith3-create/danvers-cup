@@ -89,7 +89,7 @@ export default async function HistorySeasonPage({
 
   const { data: rounds } = await supabase
     .from("rounds")
-    .select("id, round_number, name, round_date, status, courses(name, city, state)")
+    .select("id, course_id, round_number, name, round_date, status, courses(id, name, city, state)")
     .eq("season_id", season.id)
     .order("round_date", { ascending: true })
     .order("round_number", { ascending: true });
@@ -245,9 +245,16 @@ rounds.map((round: any) => {
 
       <h3 className="mt-2 text-xl font-black">{round.name}</h3>
 
-      <p className="mt-1 text-sm text-danvers-muted">
-        {getSingleRelation(round.courses)?.name ?? "Course TBD"}
-      </p>
+      {getSingleRelation(round.courses)?.id ? (
+  <div className="mt-1">
+    <span className="text-sm text-danvers-muted">Course: </span>
+    <span className="text-sm font-black text-danvers-gold">
+      {getSingleRelation(round.courses)?.name}
+    </span>
+  </div>
+) : (
+  <p className="mt-1 text-sm text-danvers-muted">Course TBD</p>
+)}
 
       <p className="mt-1 text-xs text-danvers-muted">
         {formatDate(round.round_date)}

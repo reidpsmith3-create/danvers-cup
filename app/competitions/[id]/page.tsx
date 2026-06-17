@@ -44,7 +44,7 @@ function playerNames(ids: string[], players: any[]) {
 export default async function CompetitionPage({ params }: CompetitionPageProps) {
   const { data: competition } = await supabase
     .from("competitions")
-    .select("*, rounds(round_number, name, status, courses(name))")
+    .select("*, rounds(round_number, name, status, courses(id, name))")
     .eq("id", params.id)
     .single();
 
@@ -113,10 +113,23 @@ const players =
 
           <h1 className="mt-4 text-5xl font-black">{competition.name}</h1>
 
-          <p className="mt-3 text-danvers-muted">
-            {competition.rounds?.courses?.name ?? "Course TBD"} ·{" "}
-            {scoringRule.label} · {competition.scoring_basis}
-          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-danvers-muted">
+  {competition.rounds?.courses?.id ? (
+    <Link
+      href={`/courses/${competition.rounds.courses.id}`}
+      className="font-black text-danvers-gold hover:underline"
+    >
+      {competition.rounds.courses.name}
+    </Link>
+  ) : (
+    <span>Course TBD</span>
+  )}
+
+  <span>·</span>
+  <span>{scoringRule.label}</span>
+  <span>·</span>
+  <span>{competition.scoring_basis}</span>
+</div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-danvers-border bg-black/20 p-4">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import Countdown from "@/components/Countdown";
 
 function formatRoundDate(date?: string | null) {
   if (!date) return "Date TBD";
@@ -24,6 +25,16 @@ function formatTeeTime(time?: string | null) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+function getDaysUntil(date: string) {
+  const today = new Date();
+  const target = new Date(`${date}T00:00:00`);
+
+  today.setHours(0, 0, 0, 0);
+
+  const diff = target.getTime() - today.getTime();
+
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
@@ -53,7 +64,7 @@ export default async function Home() {
 
   const { data: rounds } = await supabase
     .from("rounds")
-    .select("id, round_number, name, round_date, tee_time, status, courses(name, city, state)")
+    .select("id, course_id, round_number, name, round_date, tee_time, status, courses(name, city, state)")
     .eq("season_id", season?.id)
     .order("round_number", { ascending: true });
 
@@ -69,6 +80,7 @@ export default async function Home() {
     rounds?.[0];
 
   const liveRound = rounds?.find((round) => round.status === "live");
+  const daysUntilCup = getDaysUntil(season?.start_date ?? "2026-10-22");
 
   const heroStyle = settings?.hero_image_url
     ? {
@@ -159,20 +171,27 @@ export default async function Home() {
                       : settings?.scheduled_subtitle ?? "Myrtle Beach awaits"}
                   </p>
                 </div>
-
-                <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-danvers-green/60 bg-black/50">
-                  <div className="text-center">
-                    <p className="text-3xl font-black text-white">0%</p>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-danvers-muted">
-                      Complete
-                    </p>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
         </section>
+<section className="mt-6 rounded-[2rem] border border-danvers-gold/25 bg-gradient-to-br from-danvers-green/20 to-black/50 p-6 shadow-xl shadow-black/20">
+  <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
+    Countdown
+  </p>
 
+  <h2 className="mt-3 text-3xl font-black">
+    Danvers Cup 2026
+  </h2>
+
+  <p className="mt-2 text-sm text-danvers-muted">
+    October 22, 2026 • Myrtle Beach, South Carolina
+  </p>
+
+  <div className="mt-5">
+    <Countdown targetDate="2026-10-22T08:00:00" />
+  </div>
+</section>
         {nextRound &&
           (() => {
             const course = getSingleRelation(nextRound.courses);
@@ -183,11 +202,10 @@ export default async function Home() {
               {settings?.next_up_label ?? "Next Up"}
             </p>
 
-            <Link
-              href="/schedule"
-              className="block overflow-hidden rounded-3xl border border-danvers-green/30 bg-gradient-to-br from-danvers-surface to-black/50 bg-cover bg-center shadow-xl shadow-black/20"
-              style={nextRoundStyle}
-            >
+<div
+  className="overflow-hidden rounded-3xl border border-danvers-green/30 bg-gradient-to-br from-danvers-surface to-black/50 bg-cover bg-center shadow-xl shadow-black/20"
+  style={nextRoundStyle}
+>
               <div className="h-1 bg-gradient-to-r from-danvers-green via-danvers-gold to-danvers-green" />
 
               <div className="min-h-[260px] p-5 flex flex-col justify-end">
@@ -200,9 +218,12 @@ export default async function Home() {
                 <div className="mt-4 flex items-end justify-between gap-4">
                   <div>
                     <h2 className="text-2xl font-black">{nextRound.name}</h2>
-                    <p className="mt-2 text-sm font-medium text-danvers-muted">
-                      {course?.name}
-                    </p>
+                    <Link
+  href={`/courses/${nextRound.course_id}`}
+  className="mt-2 block text-sm font-black text-danvers-gold hover:underline"
+>
+  {course?.name}
+</Link>
                     <p className="mt-1 text-sm text-danvers-muted">
                       {course?.city}, {course?.state}
                     </p>
@@ -218,40 +239,19 @@ export default async function Home() {
                   </div>
                 </div>
               </div>
-            </Link>
+            </div>
           </section>
             );
           })()}
-
-        <section className="mt-6 grid grid-cols-4 gap-3">
-          {[
-            { label: "Schedule", href: "/schedule", icon: "📅" },
-            { label: "Live", href: "/live", icon: "📡" },
-            { label: "Standings", href: "/standings", icon: "🏆" },
-            { label: "History", href: "/history", icon: "🏛️" },
-          ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-2xl border border-white/10 bg-danvers-surface/80 p-3 text-center shadow-lg shadow-black/20"
-            >
-              <div className="text-2xl">{item.icon}</div>
-              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-white">
-                {item.label}
-              </p>
-            </Link>
-          ))}
-        </section>
-
         <section className="mt-6 grid gap-4">
           <div className="rounded-3xl border border-danvers-green/30 bg-gradient-to-br from-danvers-green/20 to-black/40 p-5 shadow-xl shadow-black/20">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-danvers-gold">
-                  2026 Snapshot
+                  Trip Itinerary
                 </p>
                 <h2 className="mt-3 text-2xl font-black">
-                  Three Days. Eight Players. One Cup.
+                  Three Rounds. Three Courses. One Cup.
                 </h2>
               </div>
 
@@ -371,7 +371,7 @@ export default async function Home() {
               Defending Champions
             </p>
 
-            <h2 className="mt-3 text-3xl font-black">The Teams to Beat</h2>
+            <h2 className="mt-3 text-3xl font-black">Defending the Cup</h2>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-3xl border border-white/10 bg-black/25 p-5">

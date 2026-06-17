@@ -13,13 +13,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const payload = {
-    name,
-    city: String(body.city ?? "").trim() || null,
-    state: String(body.state ?? "").trim() || null,
-    website_url: String(body.websiteUrl ?? "").trim() || null,
-    logo_url: String(body.logoUrl ?? "").trim() || null,
-  };
+const payload = {
+  name,
+  city: String(body.city ?? "").trim() || null,
+  state: String(body.state ?? "").trim() || null,
+  website_url: String(body.websiteUrl ?? "").trim() || null,
+  logo_url: String(body.logoUrl ?? "").trim() || null,
+  hero_image_url: String(body.heroImageUrl ?? "").trim() || null,
+  notes: String(body.notes ?? "").trim() || null,
+};
 
   if (body.id) {
     const { data, error } = await supabase

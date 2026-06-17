@@ -102,7 +102,7 @@ export default async function CompetitionArchivePage({
 
   const { data: competition } = await supabase
     .from("competitions")
-    .select("*, rounds(id, name, round_date, courses(name, city, state))")
+    .select("*, rounds(id, name, round_date, courses(id, name, city, state))")
     .eq("id", params.competitionId)
     .single();
 
@@ -224,13 +224,25 @@ const matchups = dbMatchups;
 
           <h1 className="mt-4 text-5xl font-black">{competition.name}</h1>
 
-          <p className="mt-4 text-sm text-danvers-muted">
-            {formatDate(round?.round_date)} · {course?.name ?? "Course TBD"}
-          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-danvers-muted">
+  <span>{formatDate(round?.round_date)}</span>
+  <span>·</span>
 
-          <p className="mt-2 text-sm text-danvers-muted">
-            {course?.city}, {course?.state}
-          </p>
+  {course?.id ? (
+    <Link
+      href={`/courses/${course.id}`}
+      className="font-black text-danvers-gold hover:underline"
+    >
+      {course.name}
+    </Link>
+  ) : (
+    <span>Course TBD</span>
+  )}
+</div>
+
+<p className="mt-2 text-sm text-danvers-muted">
+  📍 {course?.city}, {course?.state}
+</p>
         </section>
 
         {matchups.length ? (

@@ -87,8 +87,8 @@ export default async function RoundArchivePage({ params }: RoundArchivePageProps
   const { data: round } = await supabase
     .from("rounds")
     .select(
-      "id, season_id, course_id, round_number, name, round_date, tee_time, status, courses(name, city, state, website_url, logo_url)"
-    )
+  "id, season_id, course_id, round_number, name, round_date, tee_time, status, courses(id, name, city, state, website_url, logo_url)"
+)
     .eq("id", params.roundId)
     .single();
 
@@ -190,12 +190,27 @@ const story = get2024RoundStory(round.name);
               {formatTime(round.tee_time) ? ` · ${formatTime(round.tee_time)}` : ""}
             </p>
 
-            <p className="mt-2 text-sm text-danvers-muted">
-              {course?.name ?? "Course TBD"}
-              {course?.city || course?.state
-                ? ` · ${course?.city ?? ""}${course?.city && course?.state ? ", " : ""}${course?.state ?? ""}`
-                : ""}
-            </p>
+            <div className="mt-2 text-sm text-danvers-muted">
+  {course?.id ? (
+    <Link
+      href={`/courses/${course.id}`}
+      className="font-black text-danvers-gold hover:underline"
+    >
+      {course.name}
+    </Link>
+  ) : (
+    <span>Course TBD</span>
+  )}
+
+  {course?.city || course?.state ? (
+    <span>
+      {" "}
+      · 📍 {course?.city ?? ""}
+      {course?.city && course?.state ? ", " : ""}
+      {course?.state ?? ""}
+    </span>
+  ) : null}
+</div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-white/10 bg-black/30 p-4">

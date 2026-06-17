@@ -39,6 +39,12 @@ const adminLinks = [
     title: "Trip Events",
     description: "Add non-golf schedule items like dinners, arrival, and pairings night.",
   },
+  {
+  href: "/admin/trip-info",
+  title: "Trip Info",
+  description:
+    "Manage lodging details, packing lists, course notes, restaurants, FAQs, and other trip information.",
+},
     {
     href: "/admin/courses",
     title: "Courses",

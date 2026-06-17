@@ -179,13 +179,16 @@ export default async function SchedulePage() {
                                 {round.name}
                               </h3>
 
-                              <p className="mt-3 text-danvers-muted">
-                                {round.courses?.name}
-                              </p>
+                              <Link
+  href={`/courses/${round.course_id}`}
+  className="mt-3 block font-black text-danvers-gold hover:underline"
+>
+  {round.courses?.name}
+</Link>
 
-                              <p className="text-sm text-danvers-muted">
-                                {round.courses?.city}, {round.courses?.state}
-                              </p>
+                             <p className="mt-2 text-sm font-bold text-danvers-muted">
+  📍 {round.courses?.city}, {round.courses?.state}
+</p>
                             </div>
 
                             <div className="text-right">
@@ -275,9 +278,9 @@ export default async function SchedulePage() {
                             </p>
                           ) : null}
 
-                          <p className="mt-3 text-sm text-danvers-muted">
-                            {event.location ?? "Location TBD"}
-                          </p>
+                          <p className="mt-3 text-sm font-bold text-danvers-muted">
+  📍 {event.location ?? "Location TBD"}
+</p>
                         </div>
 
                         <div className="text-right">

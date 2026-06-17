@@ -11,6 +11,8 @@ type Course = {
   state: string | null;
   website_url: string | null;
   logo_url: string | null;
+  hero_image_url?: string | null;
+  notes?: string | null;
 };
 
 export default function CourseForm({ course }: { course?: Course }) {
@@ -18,48 +20,60 @@ export default function CourseForm({ course }: { course?: Course }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
-  async function uploadLogo(file: File) {
-    const extension = file.name.split(".").pop();
-    const path = `courses/${course?.id ?? "new"}-${Date.now()}.${extension}`;
+async function uploadCourseImage(file: File, type: "logo" | "hero") {
+  const extension = file.name.split(".").pop();
+  const path = `courses/${course?.id ?? "new"}-${type}-${Date.now()}.${extension}`;
 
-    const { error } = await supabase.storage
-      .from("site-assets")
-      .upload(path, file, {
-        cacheControl: "3600",
-        upsert: true,
-      });
+  const { error } = await supabase.storage
+    .from("site-assets")
+    .upload(path, file, {
+      cacheControl: "3600",
+      upsert: true,
+    });
 
-    if (error) throw new Error(error.message);
+  if (error) throw new Error(error.message);
 
-    const { data } = supabase.storage.from("site-assets").getPublicUrl(path);
-    return data.publicUrl;
-  }
+  const { data } = supabase.storage.from("site-assets").getPublicUrl(path);
+  return data.publicUrl;
+}
 
   async function handleSubmit(formData: FormData) {
     setSaving(true);
     setMessage("");
 
     try {
-      const logo = formData.get("logo") as File | null;
-      let logoUrl = course?.logo_url ?? "";
+const logo = formData.get("logo") as File | null;
+const heroImage = formData.get("hero_image") as File | null;
 
-      if (logo && logo.size > 0) {
-        logoUrl = await uploadLogo(logo);
-      }
+let logoUrl = course?.logo_url ?? "";
+let heroImageUrl =
+  String(formData.get("hero_image_url") ?? "").trim() ||
+  course?.hero_image_url ||
+  "";
+
+if (logo && logo.size > 0) {
+  logoUrl = await uploadCourseImage(logo, "logo");
+}
+
+if (heroImage && heroImage.size > 0) {
+  heroImageUrl = await uploadCourseImage(heroImage, "hero");
+}
 
       const response = await fetch("/api/admin/courses/save", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          id: course?.id ?? null,
-          name: formData.get("name"),
-          city: formData.get("city"),
-          state: formData.get("state"),
-          websiteUrl: formData.get("website_url"),
-          logoUrl,
-        }),
+body: JSON.stringify({
+  id: course?.id ?? null,
+  name: formData.get("name"),
+  city: formData.get("city"),
+  state: formData.get("state"),
+  websiteUrl: formData.get("website_url"),
+  heroImageUrl,
+  notes: formData.get("notes"),
+  logoUrl,
+}),
       });
 
       if (!response.ok) {
@@ -148,6 +162,36 @@ export default function CourseForm({ course }: { course?: Course }) {
           defaultValue={course?.website_url ?? ""}
           className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-danvers-gold"
         />
+        <input
+  name="hero_image_url"
+  placeholder="Hero Image URL"
+  defaultValue={course?.hero_image_url ?? ""}
+  className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-danvers-gold"
+/>
+{course?.hero_image_url ? (
+  <div className="overflow-hidden rounded-[2rem] border border-danvers-gold/30">
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img
+      src={course.hero_image_url}
+      alt={`${course.name ?? "Course"} hero`}
+      className="h-48 w-full object-cover"
+    />
+  </div>
+) : null}
+
+<input
+  name="hero_image"
+  type="file"
+  accept="image/*"
+  className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white file:mr-4 file:rounded-full file:border-0 file:bg-danvers-gold file:px-4 file:py-2 file:text-xs file:font-black file:uppercase file:tracking-[0.15em] file:text-black"
+/>
+<textarea
+  name="notes"
+  rows={6}
+  placeholder="Course notes, signature holes, trip notes, betting games, etc."
+  defaultValue={course?.notes ?? ""}
+  className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-danvers-gold"
+/>
       </section>
 
       <button
