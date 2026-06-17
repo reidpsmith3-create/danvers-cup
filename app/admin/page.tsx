@@ -34,6 +34,12 @@ const adminLinks = [
     title: "Rounds",
     description: "Set the current round as scheduled, live, or complete.",
   },
+  {
+  href: "/admin/groups",
+  title: "Groups / Pairings",
+  description:
+    "Create round groups, assign players to foursomes, and set scorekeepers.",
+},
     {
     href: "/admin/schedule-events",
     title: "Trip Events",

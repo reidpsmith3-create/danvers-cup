@@ -754,22 +754,19 @@ const projectedCurrentRoundPoints =
             )}
           </div>
 
-          <div>
-            <p className="font-black">{player.name}</p>
-            <p className="text-xs uppercase text-danvers-muted">
-              {player.holesPlayed} holes · HCP {player.handicap}
-            </p>
-          </div>
-        </div>
+<div>
+  <p className="font-black">{player.name}</p>
 
-        <div className="text-right">
-          <p className="text-2xl font-black">
-            {player.holesPlayed > 0 ? formatToPar(player.netToPar) : "—"}
-          </p>
-          <p className="text-xs uppercase text-danvers-muted">
-            Net · Gross{" "}
-            {player.holesPlayed > 0 ? formatToPar(player.grossToPar) : "—"}
-          </p>
+  <p className="mt-1 text-lg font-black text-danvers-green">
+    {player.holesPlayed > 0
+      ? formatToPar(player.netToPar)
+      : "—"}
+  </p>
+
+  <p className="text-xs uppercase tracking-[0.15em] text-danvers-muted">
+    THRU {player.holesPlayed}
+  </p>
+</div>
         </div>
       </Link>
     ))}

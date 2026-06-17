@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import ScoreEntryForm from "@/components/score-entry/ScoreEntryForm";
-import { getCurrentRound } from "@/lib/rounds/getCurrentRound";
 import { getCurrentSeason } from "@/lib/currentSeason";
 
 type ScoreEntryPageProps = {
   searchParams?: {
     round?: string;
+    group?: string;
   };
 };
 
@@ -14,8 +14,12 @@ export default async function ScoreEntryPage({
   searchParams,
 }: ScoreEntryPageProps) {
   const requestedRoundNumber = searchParams?.round
-  ? Number(searchParams.round)
-  : null;
+    ? Number(searchParams.round)
+    : null;
+
+  const requestedGroupNumber = searchParams?.group
+    ? Number(searchParams.group)
+    : null;
 
   const season = await getCurrentSeason();
 
@@ -27,22 +31,65 @@ export default async function ScoreEntryPage({
 
   const liveRound = rounds?.find((item) => item.status === "live");
 
-const round = requestedRoundNumber
-  ? rounds?.find((item) => item.round_number === requestedRoundNumber) ??
-    liveRound ??
-    rounds?.[0]
-  : liveRound ?? rounds?.[0];
+  const round = requestedRoundNumber
+    ? rounds?.find((item) => item.round_number === requestedRoundNumber) ??
+      liveRound ??
+      rounds?.[0]
+    : liveRound ?? rounds?.[0];
 
-  const { data: players } = await supabase
+  const { data: groups } = round
+    ? await supabase
+        .from("round_groups")
+        .select("id, group_number, name, tee_time")
+        .eq("round_id", round.id)
+        .order("group_number", { ascending: true })
+    : { data: [] };
+
+  const selectedGroup =
+    requestedGroupNumber && groups?.length
+      ? groups.find((group) => group.group_number === requestedGroupNumber) ??
+        groups[0]
+      : groups?.[0] ?? null;
+
+  const { data: groupPlayers } = selectedGroup
+    ? await supabase
+        .from("group_players")
+        .select("player_id, sort_order, players(full_name)")
+        .eq("group_id", selectedGroup.id)
+        .order("sort_order", { ascending: true })
+    : { data: [] };
+
+  const { data: allSeasonPlayers } = await supabase
     .from("season_players")
     .select("player_id, players(full_name)")
     .eq("season_id", season?.id)
     .order("created_at", { ascending: true });
 
   const scorePlayers =
-    players?.map((row: any) => ({
-      playerId: row.player_id,
-      playerName: row.players?.full_name ?? "Unknown Player",
+    selectedGroup && groupPlayers && groupPlayers.length > 0
+      ? groupPlayers.map((row: any) => ({
+          playerId: row.player_id,
+          playerName: row.players?.full_name ?? "Unknown Player",
+        }))
+      : allSeasonPlayers?.map((row: any) => ({
+          playerId: row.player_id,
+          playerName: row.players?.full_name ?? "Unknown Player",
+        })) ?? [];
+
+  const { data: courseHoles } = round?.course_id
+    ? await supabase
+        .from("course_holes")
+        .select("hole_number, par, yardage, handicap_number")
+        .eq("course_id", round.course_id)
+        .order("hole_number", { ascending: true })
+    : { data: [] };
+
+  const holes =
+    courseHoles?.map((hole: any) => ({
+      holeNumber: hole.hole_number,
+      par: hole.par,
+      yardage: hole.yardage,
+      handicapNumber: hole.handicap_number,
     })) ?? [];
 
   return (
@@ -79,10 +126,37 @@ const round = requestedRoundNumber
               );
             })}
           </div>
+
+          {groups && groups.length > 0 && round ? (
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {groups.map((group) => {
+                const isActive = group.id === selectedGroup?.id;
+
+                return (
+                  <Link
+                    key={group.id}
+                    href={`/score-entry?round=${round.round_number}&group=${group.group_number}`}
+                    className={`rounded-2xl px-4 py-3 text-sm font-black ${
+                      isActive
+                        ? "bg-danvers-gold text-black"
+                        : "border border-danvers-border bg-black/20 text-danvers-muted"
+                    }`}
+                  >
+                    {group.name ?? `Group ${group.group_number}`}
+{group.tee_time ? ` · ${group.tee_time}` : ""}
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-4 rounded-2xl border border-danvers-border bg-black/20 p-4 text-sm text-danvers-muted">
+              No groups found for this round. Showing all players.
+            </p>
+          )}
         </div>
 
         {round ? (
-          <ScoreEntryForm roundId={round.id} players={scorePlayers} />
+          <ScoreEntryForm roundId={round.id} players={scorePlayers} holes={holes} />
         ) : (
           <p className="mt-6 text-danvers-muted">No round found.</p>
         )}
