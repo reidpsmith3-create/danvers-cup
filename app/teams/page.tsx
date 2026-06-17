@@ -38,6 +38,40 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+function formatPoints(points: number) {
+  return Number.isInteger(points) ? String(points) : points.toFixed(1);
+}
+
+function getMatchRecord(teamId: string, matches: any[]) {
+  let wins = 0;
+  let losses = 0;
+  let ties = 0;
+
+  matches.forEach((match) => {
+    const isSideA = match.team_a_id === teamId;
+    const isSideB = match.team_b_id === teamId;
+
+    if (!isSideA && !isSideB) return;
+
+    if (match.winning_side === "halved") {
+      ties += 1;
+      return;
+    }
+
+    if (
+      (isSideA && match.winning_side === "team_a") ||
+      (isSideB && match.winning_side === "team_b")
+    ) {
+      wins += 1;
+      return;
+    }
+
+    losses += 1;
+  });
+
+  return `${wins}-${losses}-${ties}`;
+}
+
 export default async function TeamsPage() {
   const { data: season } = await supabase
     .from("seasons")
@@ -55,15 +89,36 @@ export default async function TeamsPage() {
 
   const teams = (teamsData as TeamRow[] | null) ?? [];
 
+  const teamIds = teams.map((team) => team.id);
+
   const { data: membersData } =
-    teams.length > 0
+    teamIds.length > 0
       ? await supabase
           .from("team_members")
           .select("team_id, players(id, full_name, photo_url)")
-          .in(
-            "team_id",
-            teams.map((team) => team.id)
+          .in("team_id", teamIds)
+      : { data: [] };
+
+  const { data: resultsData } =
+    season?.id && teamIds.length > 0
+      ? await supabase
+          .from("competition_results")
+          .select("team_id, points, competitions(season_id, is_visible)")
+          .in("team_id", teamIds)
+          .eq("is_official", true)
+      : { data: [] };
+
+  const { data: matchesData } =
+    season?.id && teamIds.length > 0
+      ? await supabase
+          .from("matches")
+          .select(
+            "team_a_id, team_b_id, winning_side, competitions(season_id, is_visible)"
           )
+          .or(
+            `team_a_id.in.(${teamIds.join(",")}),team_b_id.in.(${teamIds.join(",")})`
+          )
+          .eq("is_official", true)
       : { data: [] };
 
   const membersByTeamId = new Map<string, TeamMemberRow[]>();
@@ -72,6 +127,26 @@ export default async function TeamsPage() {
     const existing = membersByTeamId.get(member.team_id) ?? [];
     membersByTeamId.set(member.team_id, [...existing, member]);
   });
+
+  const visibleSeasonResults = ((resultsData as any[]) ?? []).filter(
+    (result) => {
+      const competition = getSingleRelation(result.competitions);
+      return (
+        competition?.season_id === season?.id &&
+        competition?.is_visible !== false
+      );
+    }
+  );
+
+  const visibleSeasonMatches = ((matchesData as any[]) ?? []).filter(
+    (match) => {
+      const competition = getSingleRelation(match.competitions);
+      return (
+        competition?.season_id === season?.id &&
+        competition?.is_visible !== false
+      );
+    }
+  );
 
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
@@ -86,12 +161,11 @@ export default async function TeamsPage() {
             </p>
 
             <h1 className="mt-4 text-5xl font-extrabold leading-none tracking-tight">
-              2026 Teams
+              {season?.year ?? "Current"} Teams
             </h1>
 
             <p className="mt-4 max-w-2xl text-sm leading-6 text-danvers-muted">
-              The Danvers Cup teams are season-specific. Each trip gets its own
-              rosters, matchups, and team champion.
+              Season-specific rosters, points, records, and team race snapshots.
             </p>
           </div>
         </section>
@@ -100,6 +174,15 @@ export default async function TeamsPage() {
           {teams.map((team) => {
             const teamColor = team.color || "#1f7a4d";
             const members = membersByTeamId.get(team.id) ?? [];
+
+            const teamPoints = visibleSeasonResults
+              .filter((result) => result.team_id === team.id)
+              .reduce(
+                (total, result) => total + Number(result.points ?? 0),
+                0
+              );
+
+            const teamRecord = getMatchRecord(team.id, visibleSeasonMatches);
 
             return (
               <Link
@@ -118,7 +201,7 @@ export default async function TeamsPage() {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.25em] text-danvers-gold">
-                        2026 Team
+                        Season Team
                       </p>
                       <h2 className="mt-2 text-3xl font-black">
                         {team.name}
@@ -145,9 +228,38 @@ export default async function TeamsPage() {
                     </div>
                   </div>
 
+                  <div className="mt-5 grid grid-cols-3 gap-3">
+                    <div className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-danvers-muted">
+                        Players
+                      </p>
+                      <p className="mt-2 text-xl font-black text-danvers-gold">
+                        {members.length}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-danvers-muted">
+                        Points
+                      </p>
+                      <p className="mt-2 text-xl font-black text-danvers-gold">
+                        {formatPoints(teamPoints)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-danvers-muted">
+                        Record
+                      </p>
+                      <p className="mt-2 text-xl font-black text-danvers-gold">
+                        {teamRecord}
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="mt-5 rounded-3xl border border-white/10 bg-black/25 p-4">
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-danvers-muted">
-                      Roster
+                      Roster Preview
                     </p>
 
                     <div className="mt-4 flex -space-x-3">
@@ -176,7 +288,11 @@ export default async function TeamsPage() {
                     </div>
 
                     <p className="mt-4 text-sm text-danvers-muted">
-                      {members.length} players
+                      {members
+                        .map((member) => getSingleRelation(member.players))
+                        .filter(Boolean)
+                        .map((player: any) => player.full_name)
+                        .join(", ")}
                     </p>
                   </div>
 

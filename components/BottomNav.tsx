@@ -15,6 +15,11 @@ const primaryLinks = [
     icon: "📅",
   },
   {
+    href: "/trip-info",
+    label: "Trip Info",
+    icon: "ℹ️",
+  },
+  {
     href: "/live",
     label: "Live",
     icon: "⛳",
@@ -27,11 +32,6 @@ const primaryLinks = [
 ];
 
 const moreLinks = [
- {
-  href: "/trip-info",
-  label: "Trip Info",
-  icon: "ℹ️",
-},
   {
     href: "/players",
     label: "Players",

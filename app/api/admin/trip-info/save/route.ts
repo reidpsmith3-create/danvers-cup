@@ -15,14 +15,20 @@ export async function POST(request: Request) {
     );
   }
 
-  const payload = {
-    season_id: seasonId,
-    eyebrow: body.eyebrow || null,
-    title,
-    body: body.body || null,
-    sort_order: Number(body.sortOrder ?? 0),
-    is_visible: Boolean(body.isVisible),
-  };
+const payload = {
+  season_id: seasonId,
+  eyebrow: String(body.eyebrow ?? "").trim() || null,
+  title,
+  body: String(body.body ?? "").trim() || null,
+  image_url: String(body.imageUrl ?? "").trim() || null,
+  primary_button_label: String(body.primaryButtonLabel ?? "").trim() || null,
+  primary_button_url: String(body.primaryButtonUrl ?? "").trim() || null,
+  secondary_button_label:
+    String(body.secondaryButtonLabel ?? "").trim() || null,
+  secondary_button_url: String(body.secondaryButtonUrl ?? "").trim() || null,
+  sort_order: Number(body.sortOrder ?? 0),
+  is_visible: Boolean(body.isVisible),
+};
 
   const query = sectionId
     ? supabase.from("trip_info_sections").update(payload).eq("id", sectionId)

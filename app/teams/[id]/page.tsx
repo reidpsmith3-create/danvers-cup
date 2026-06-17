@@ -16,12 +16,64 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+function formatPoints(points: number) {
+  return Number.isInteger(points) ? String(points) : points.toFixed(1);
+}
+
+function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+function getMatchRecord(teamId: string, matches: any[]) {
+  let wins = 0;
+  let losses = 0;
+  let ties = 0;
+
+  matches.forEach((match) => {
+    const isSideA = match.team_a_id === teamId;
+    const isSideB = match.team_b_id === teamId;
+
+    if (!isSideA && !isSideB) return;
+
+    if (match.winning_side === "halved") {
+      ties += 1;
+      return;
+    }
+
+    if (
+      (isSideA && match.winning_side === "team_a") ||
+      (isSideB && match.winning_side === "team_b")
+    ) {
+      wins += 1;
+      return;
+    }
+
+    losses += 1;
+  });
+
+  return `${wins}-${losses}-${ties}`;
+}
+
 export default async function TeamPage({ params }: TeamPageProps) {
   const { data: team } = await supabase
     .from("teams")
     .select("*")
     .eq("id", params.id)
     .single();
+
+  if (!team) {
+    return (
+      <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
+        <section className="mx-auto max-w-3xl">
+          <h1 className="text-4xl font-black">Team not found</h1>
+          <Link href="/teams" className="mt-4 block text-danvers-muted">
+            Back to teams
+          </Link>
+        </section>
+      </main>
+    );
+  }
 
   const { data: members } = await supabase
     .from("team_members")
@@ -43,27 +95,105 @@ export default async function TeamPage({ params }: TeamPageProps) {
       ? await supabase
           .from("season_players")
           .select("player_id, handicap")
+          .eq("season_id", team.season_id)
           .in("player_id", playerIds)
       : { data: [] };
+
+  const { data: competitionResults } = await supabase
+    .from("competition_results")
+    .select("id, team_id, player_id, points, result_label, competitions(season_id, is_visible)")
+    .eq("is_official", true);
+
+  const { data: matches } = await supabase
+    .from("matches")
+    .select(
+  "id, team_a_id, team_b_id, team_a_name, team_b_name, team_a_player_ids, team_b_player_ids, winning_side, final_result, is_official, competitions(season_id, is_visible)"
+)
+    .eq("is_official", true);
+
+  const { data: otherTeams } = await supabase
+    .from("teams")
+    .select("id, name, color, logo_url")
+    .eq("season_id", team.season_id)
+    .neq("id", team.id)
+    .order("name", { ascending: true });
 
   const handicapByPlayerId = new Map(
     seasonPlayers?.map((row) => [row.player_id, row.handicap]) ?? []
   );
 
-  if (!team) {
-    return (
-      <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
-        <section className="mx-auto max-w-3xl">
-          <h1 className="text-4xl font-black">Team not found</h1>
-          <Link href="/teams" className="mt-4 block text-danvers-muted">
-            Back to teams
-          </Link>
-        </section>
-      </main>
-    );
-  }
+  const playerRows = (players as any[]) ?? [];
+  const visibleSeasonResults = ((competitionResults as any[]) ?? []).filter(
+    (result) => {
+      const competition = getSingleRelation(result.competitions);
+      return (
+        competition?.season_id === team.season_id &&
+        competition?.is_visible !== false
+      );
+    }
+  );
 
+  const visibleSeasonMatches = ((matches as any[]) ?? []).filter((match) => {
+    const competition = getSingleRelation(match.competitions);
+    return (
+      competition?.season_id === team.season_id &&
+      competition?.is_visible !== false
+    );
+  });
+
+  const teamPoints = visibleSeasonResults
+    .filter((result) => result.team_id === team.id)
+    .reduce((total, result) => total + Number(result.points ?? 0), 0);
+
+  const playerPointRows = playerRows
+    .map((player) => {
+      const points = visibleSeasonResults
+        .filter((result) => result.player_id === player.id)
+        .reduce((total, result) => total + Number(result.points ?? 0), 0);
+
+    const matchWins = visibleSeasonMatches.filter((match) => {
+  const isPlayerSideA = (match.team_a_player_ids ?? []).includes(player.id);
+  const isPlayerSideB = (match.team_b_player_ids ?? []).includes(player.id);
+
+  if (!isPlayerSideA && !isPlayerSideB) return false;
+
+  return (
+    (isPlayerSideA && match.winning_side === "team_a") ||
+    (isPlayerSideB && match.winning_side === "team_b")
+  );
+}).length;
+
+      return {
+        ...player,
+        points,
+        matchWins,
+      };
+    })
+    .sort((a, b) => b.points - a.points);
+
+  const topPointPlayer = playerPointRows[0] ?? null;
+  const topMatchPlayer = [...playerPointRows].sort(
+    (a, b) => b.matchWins - a.matchWins
+  )[0];
+
+  const teamRecord = getMatchRecord(team.id, visibleSeasonMatches);
   const teamColor = team.color || "#1f7a4d";
+  const opponent = ((otherTeams as any[]) ?? [])[0];
+
+  const headToHeadMatches = opponent
+    ? visibleSeasonMatches.filter((match) => {
+        const hasTeam =
+          match.team_a_id === team.id || match.team_b_id === team.id;
+        const hasOpponent =
+          match.team_a_id === opponent.id || match.team_b_id === opponent.id;
+
+        return hasTeam && hasOpponent;
+      })
+    : [];
+
+  const headToHeadRecord = opponent
+    ? getMatchRecord(team.id, headToHeadMatches)
+    : "—";
 
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
@@ -91,7 +221,7 @@ export default async function TeamPage({ params }: TeamPageProps) {
               <div className="flex items-center justify-between gap-5">
                 <div>
                   <p className="text-sm font-black uppercase tracking-[0.45em] text-danvers-gold">
-                    2026 Team
+                    Season Team
                   </p>
 
                   <h1 className="mt-3 text-5xl font-extrabold leading-none tracking-tight">
@@ -128,8 +258,8 @@ export default async function TeamPage({ params }: TeamPageProps) {
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-danvers-muted">
                     Players
                   </p>
-                  <p className="mt-2 text-2xl font-black text-white">
-                    {players?.length ?? 0}
+                  <p className="mt-2 text-2xl font-black text-danvers-gold">
+                    {playerRows.length}
                   </p>
                 </div>
 
@@ -137,18 +267,80 @@ export default async function TeamPage({ params }: TeamPageProps) {
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-danvers-muted">
                     Points
                   </p>
-                  <p className="mt-2 text-2xl font-black text-white">0</p>
+                  <p className="mt-2 text-2xl font-black text-danvers-gold">
+                    {formatPoints(teamPoints)}
+                  </p>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-danvers-muted">
-                    Status
+                    Record
                   </p>
-                  <p className="mt-2 text-2xl font-black text-white">Active</p>
+                  <p className="mt-2 text-2xl font-black text-danvers-gold">
+                    {teamRecord}
+                  </p>
                 </div>
               </div>
             </div>
           </div>
+        </section>
+
+        <section className="mt-8 grid gap-4 sm:grid-cols-2">
+          <section className="rounded-[2rem] border border-white/10 bg-danvers-surface p-6">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
+              Team Leaders
+            </p>
+
+            <h2 className="mt-2 text-3xl font-black">This Season</h2>
+
+            <div className="mt-5 grid gap-3">
+              <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-danvers-muted">
+                  Points Leader
+                </p>
+                <p className="mt-2 text-xl font-black">
+                  {topPointPlayer?.full_name ?? "TBD"}
+                </p>
+                <p className="mt-1 text-sm text-danvers-gold">
+                  {formatPoints(topPointPlayer?.points ?? 0)} pts
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-danvers-muted">
+                  Match Wins Leader
+                </p>
+                <p className="mt-2 text-xl font-black">
+                  {topMatchPlayer?.full_name ?? "TBD"}
+                </p>
+                <p className="mt-1 text-sm text-danvers-gold">
+                  {topMatchPlayer?.matchWins ?? 0} win(s)
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[2rem] border border-white/10 bg-danvers-surface p-6">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
+              Head-to-Head
+            </p>
+
+            <h2 className="mt-2 text-3xl font-black">
+              {opponent ? `${team.name} vs ${opponent.name}` : "Matchup"}
+            </h2>
+
+            <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-danvers-muted">
+                Season Record
+              </p>
+              <p className="mt-2 text-3xl font-black text-danvers-gold">
+                {headToHeadRecord}
+              </p>
+              <p className="mt-2 text-sm text-danvers-muted">
+                Based on official visible matches for this season only.
+              </p>
+            </div>
+          </section>
         </section>
 
         <section className="mt-8">
@@ -162,7 +354,7 @@ export default async function TeamPage({ params }: TeamPageProps) {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            {players?.map((player) => (
+            {playerPointRows.map((player) => (
               <Link
                 key={player.id}
                 href={`/players/${player.id}`}
@@ -197,6 +389,9 @@ export default async function TeamPage({ params }: TeamPageProps) {
                     </h3>
                     <p className="mt-1 text-sm text-danvers-muted">
                       Handicap: {handicapByPlayerId.get(player.id) ?? "TBD"}
+                    </p>
+                    <p className="mt-1 text-sm text-danvers-muted">
+                      {formatPoints(player.points)} pts · {player.matchWins} match win(s)
                     </p>
                   </div>
                 </div>
