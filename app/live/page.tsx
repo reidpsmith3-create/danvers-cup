@@ -249,16 +249,6 @@ export default async function LivePage() {
     ])
   );
 
-  const coursePar = courseHoleRows.reduce(
-    (sum, hole) => sum + Number(hole.par ?? 0),
-    0
-  );
-
-  const courseYardage = courseHoleRows.reduce(
-    (sum, hole) => sum + Number(hole.yardage ?? 0),
-    0
-  );
-
   const individualLeaderboard = playerRows
     .map((seasonPlayer) => {
       const playerScores = scoreRows.filter(
@@ -351,9 +341,9 @@ export default async function LivePage() {
     .map((team, index) => {
       const officialPoints = officialTeamPointMap.get(team.teamId) ?? 0;
 
-      const projectedCurrentRoundPoints =
+const projectedCurrentRoundPoints =
   team.scoresEntered > 0 && index === 0
-    ? Number(activeCompetition?.settings?.teamWinnerPoints ?? 1)
+    ? Number((activeCompetition as any)?.settings?.teamWinnerPoints ?? 1)
     : 0;
 
       return {
@@ -799,8 +789,8 @@ export default async function LivePage() {
         );
 
         const par = parByHole.get(score.hole_number);
-        const label = getScoreLabel(Number(score.gross_score), par);
-      const activityStyle = getScoreActivityStyle(Number(score.gross_score), par);
+const label = getScoreLabel(Number(score.gross_score), par);
+const activityStyle = getScoreActivityStyle(Number(score.gross_score), par);
 
         return (
           <div
