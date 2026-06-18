@@ -69,7 +69,12 @@ export default function PairingsBuilder({
 
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
-
+  const selectedPlayerIds = groups.flatMap((group) =>
+  group.playerIds.filter(Boolean)
+);
+const assignedPlayerCount = selectedPlayerIds.length;
+const duplicateCount = assignedPlayerCount - new Set(selectedPlayerIds).size;
+const unassignedPlayerCount = players.length - new Set(selectedPlayerIds).size;
   function updateGroupName(groupNumber: number, name: string) {
     setGroups((current) =>
       current.map((group) =>
@@ -121,8 +126,20 @@ export default function PairingsBuilder({
   }
 
   async function savePairings() {
-    setIsSaving(true);
-    setMessage("");
+  setIsSaving(true);
+  setMessage("");
+
+  const usedPlayerIds = groups.flatMap((group) =>
+    group.playerIds.filter(Boolean)
+  );
+
+  const hasDuplicates = usedPlayerIds.length !== new Set(usedPlayerIds).size;
+
+  if (hasDuplicates) {
+    setMessage("Each player can only be assigned to one group.");
+    setIsSaving(false);
+    return;
+  }
 
     const response = await fetch("/api/admin/groups/save", {
       method: "POST",
@@ -171,6 +188,42 @@ export default function PairingsBuilder({
           ))}
         </select>
       </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+  <div className="rounded-2xl border border-danvers-border bg-danvers-surface p-4">
+    <p className="text-xs font-black uppercase tracking-[0.2em] text-danvers-muted">
+      Players Assigned
+    </p>
+    <p className="mt-2 text-3xl font-black">
+      {assignedPlayerCount}/{players.length}
+    </p>
+  </div>
+
+  <div className="rounded-2xl border border-danvers-border bg-danvers-surface p-4">
+    <p className="text-xs font-black uppercase tracking-[0.2em] text-danvers-muted">
+      Groups Created
+    </p>
+    <p className="mt-2 text-3xl font-black">{groups.length}</p>
+  </div>
+
+  <div
+    className={`rounded-2xl border p-4 ${
+      duplicateCount > 0
+        ? "border-red-900/50 bg-red-950/20"
+        : "border-danvers-border bg-danvers-surface"
+    }`}
+  >
+    <p className="text-xs font-black uppercase tracking-[0.2em] text-danvers-muted">
+      Status
+    </p>
+    <p className="mt-2 text-xl font-black">
+      {duplicateCount > 0
+        ? `${duplicateCount} duplicate`
+        : unassignedPlayerCount > 0
+          ? `${unassignedPlayerCount} unassigned`
+          : "Ready"}
+    </p>
+  </div>
+</div>
 
       {groups.map((group) => (
         <div
@@ -187,15 +240,24 @@ export default function PairingsBuilder({
               </h2>
             </div>
 
-            {groups.length > 1 && (
-              <button
-                type="button"
-                onClick={() => removeGroup(group.groupNumber)}
+<div className="flex items-center gap-2">
+  <a
+    href={`/score-entry?group=${group.groupNumber}`}
+    className="rounded-full border border-danvers-green/50 px-4 py-2 text-xs font-black text-danvers-green"
+  >
+    Score
+  </a>
+
+  {groups.length > 1 && (
+    <button
+      type="button"
+      onClick={() => removeGroup(group.groupNumber)}
                 className="rounded-full border border-red-900/50 px-4 py-2 text-xs font-black text-red-300"
               >
                 Remove
-              </button>
-            )}
+      </button>
+  )}
+</div>
           </div>
 
           <label className="mt-5 block text-xs font-bold uppercase tracking-[0.2em] text-danvers-muted">
@@ -236,11 +298,22 @@ export default function PairingsBuilder({
                 className="w-full rounded-2xl border border-danvers-border bg-black/30 px-4 py-3 font-bold text-danvers-text"
               >
                 <option value="">Player {index + 1}</option>
-                {players.map((player) => (
-                  <option key={player.playerId} value={player.playerId}>
-                    {player.playerName}
-                  </option>
-                ))}
+{players.map((player) => {
+  const isSelectedElsewhere =
+    selectedPlayerIds.includes(player.playerId) &&
+    player.playerId !== playerId;
+
+  return (
+    <option
+      key={player.playerId}
+      value={player.playerId}
+      disabled={isSelectedElsewhere}
+    >
+      {player.playerName}
+      {isSelectedElsewhere ? " — already selected" : ""}
+    </option>
+  );
+})}
               </select>
             ))}
           </div>

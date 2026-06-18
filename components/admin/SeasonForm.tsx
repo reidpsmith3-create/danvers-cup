@@ -13,6 +13,8 @@ type Season = {
   status: string | null;
   team_champion_name: string | null;
   individual_champion_name: string | null;
+  total_team_points_available: number | null;
+  team_points_needed_to_win: number | null;
 };
 
 export default function SeasonForm({ season }: { season?: Season }) {
@@ -39,6 +41,8 @@ export default function SeasonForm({ season }: { season?: Season }) {
         status: formData.get("status"),
         teamChampionName: formData.get("team_champion_name"),
         individualChampionName: formData.get("individual_champion_name"),
+totalTeamPointsAvailable: formData.get("total_team_points_available"),
+teamPointsNeededToWin: formData.get("team_points_needed_to_win"),
       }),
     });
 
@@ -181,10 +185,51 @@ export default function SeasonForm({ season }: { season?: Season }) {
             className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-danvers-gold"
           />
         </div>
-      </section>
+</section>
 
-      <button
-        type="submit"
+<section className="space-y-5 rounded-[2rem] border border-white/10 bg-black/20 p-5">
+  <h2 className="text-2xl font-black">Tournament Points</h2>
+
+  <div>
+    <label className="text-xs font-bold uppercase tracking-[0.2em] text-danvers-gold">
+      Total Team Points Available
+    </label>
+
+    <input
+      name="total_team_points_available"
+      type="number"
+      step="0.5"
+      defaultValue={season?.total_team_points_available ?? ""}
+      className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-danvers-gold"
+    />
+
+    <p className="mt-2 text-xs text-danvers-muted">
+      Total number of team points available across the entire Danvers Cup.
+    </p>
+  </div>
+
+  <div>
+    <label className="text-xs font-bold uppercase tracking-[0.2em] text-danvers-gold">
+      Team Points Needed To Win
+    </label>
+
+    <input
+      name="team_points_needed_to_win"
+      type="number"
+      step="0.5"
+      defaultValue={season?.team_points_needed_to_win ?? ""}
+      className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-danvers-gold"
+    />
+
+    <p className="mt-2 text-xs text-danvers-muted">
+      Number of points required to clinch the Cup. Usually half the available
+      points plus 0.5 (example: 20 points available = 10.5 needed to win).
+    </p>
+  </div>
+</section>
+
+<button
+  type="submit"
         disabled={saving}
         className="w-full rounded-full bg-danvers-gold px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-black disabled:opacity-60"
       >

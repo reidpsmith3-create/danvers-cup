@@ -10,6 +10,7 @@ type TeamRow = {
 
 type TeamMemberRow = {
   team_id: string;
+  player_id: string;
   players:
     | {
         id: string;
@@ -95,7 +96,7 @@ export default async function TeamsPage() {
     teamIds.length > 0
       ? await supabase
           .from("team_members")
-          .select("team_id, players(id, full_name, photo_url)")
+          .select("team_id, player_id, players(id, full_name, photo_url)")
           .in("team_id", teamIds)
       : { data: [] };
 
@@ -147,6 +148,17 @@ export default async function TeamsPage() {
       );
     }
   );
+const { data: seasonPlayersData } = await supabase
+  .from("season_players")
+  .select("player_id, handicap")
+  .eq("season_id", season?.id);
+
+  const handicapByPlayerId = new Map(
+  ((seasonPlayersData as any[]) ?? []).map((row) => [
+    row.player_id,
+    row.handicap,
+  ])
+);
 
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
@@ -182,7 +194,11 @@ export default async function TeamsPage() {
                 0
               );
 
-            const teamRecord = getMatchRecord(team.id, visibleSeasonMatches);
+            const totalHandicap = members.reduce((total, member) => {
+  const handicap = handicapByPlayerId.get(member.player_id);
+  return total + Number(handicap ?? 0);
+}, 0);
+const teamRecord = getMatchRecord(team.id, visibleSeasonMatches);
 
             return (
               <Link
@@ -228,7 +244,7 @@ export default async function TeamsPage() {
                     </div>
                   </div>
 
-                  <div className="mt-5 grid grid-cols-3 gap-3">
+                  <div className="mt-5 grid grid-cols-4 gap-3">
                     <div className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center">
                       <p className="text-[10px] font-black uppercase tracking-[0.15em] text-danvers-muted">
                         Players
@@ -237,6 +253,14 @@ export default async function TeamsPage() {
                         {members.length}
                       </p>
                     </div>
+                    <div className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center">
+  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-danvers-muted">
+    HCP
+  </p>
+  <p className="mt-2 text-xl font-black text-danvers-gold">
+    {totalHandicap.toFixed(1)}
+  </p>
+</div>
 
                     <div className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center">
                       <p className="text-[10px] font-black uppercase tracking-[0.15em] text-danvers-muted">

@@ -23,28 +23,19 @@ function getMatchScore(holes: any[]) {
   const teamBWins = holes.filter((hole) => hole.winning_side === "team_b").length;
   const margin = Math.abs(teamAWins - teamBWins);
 
-  if (holes.length === 0) {
+  if (holes.length === 0 || margin === 0) {
     return {
       label: "All Square",
       shortLabel: "AS",
-      leadingSide: null,
-      margin: 0,
-    };
-  }
-
-  if (margin === 0) {
-    return {
-      label: "All Square",
-      shortLabel: "AS",
-      leadingSide: null,
+      leadingSide: null as "team_a" | "team_b" | null,
       margin: 0,
     };
   }
 
   return {
-    label: teamAWins > teamBWins ? `${margin} Up` : `${margin} Down`,
-    shortLabel: teamAWins > teamBWins ? `${margin} UP` : `${margin} DN`,
-    leadingSide: teamAWins > teamBWins ? "team_a" : "team_b",
+    label: teamAWins > teamBWins ? `Team A ${margin} Up` : `Team B ${margin} Up`,
+    shortLabel: `${margin} UP`,
+    leadingSide: teamAWins > teamBWins ? "team_a" as const : "team_b" as const,
     margin,
   };
 }
@@ -117,7 +108,9 @@ function ScoreBadge({
 export default async function MatchPage({ params }: MatchPageProps) {
   const { data: match } = await supabase
     .from("matches")
-    .select("*, competitions(id, name, season_id, settings, rounds(course_id))")
+    .select(
+      "*, competitions(id, name, season_id, settings, rounds(course_id)), team_a:teams!matches_team_a_id_fkey(id, name, color, logo_url), team_b:teams!matches_team_b_id_fkey(id, name, color, logo_url)"
+    )
     .eq("id", params.id)
     .single();
 
@@ -179,6 +172,11 @@ export default async function MatchPage({ params }: MatchPageProps) {
     match.team_b_name ??
     "Side B";
 
+  const sideATeamName = match.team_a?.name ?? match.team_a_name ?? "Team A";
+  const sideBTeamName = match.team_b?.name ?? match.team_b_name ?? "Team B";
+  const sideAColor = match.team_a?.color ?? "#1f7a4d";
+  const sideBColor = match.team_b?.color ?? "#c39b45";
+
   const holeInfoRows = (courseHoles as any[]) ?? [];
 
   const holeInfoByNumber = new Map(
@@ -217,14 +215,34 @@ export default async function MatchPage({ params }: MatchPageProps) {
   const sideAIsLeading = matchScore.leadingSide === "team_a";
   const sideBIsLeading = matchScore.leadingSide === "team_b";
 
+  const leaderName =
+    matchScore.leadingSide === "team_a"
+      ? sideAPlayers
+      : matchScore.leadingSide === "team_b"
+        ? sideBPlayers
+        : null;
+
+  const leaderColor =
+    matchScore.leadingSide === "team_a"
+      ? sideAColor
+      : matchScore.leadingSide === "team_b"
+        ? sideBColor
+        : "#c39b45";
+
+  const heroStatus =
+  match.final_result && match.winning_side
+    ? match.winning_side === "halved"
+      ? "Match Halved"
+      : `${leaderName} wins ${match.final_result}`
+    : matchScore.margin === 0
+      ? "All Square"
+      : `${leaderName} ${matchScore.margin} Up`;
+
   return (
     <main className="min-h-screen px-4 pb-24 pt-5 text-danvers-text">
       <section className="mx-auto max-w-5xl">
-        <Link
-          href={`/competitions/${match.competitions?.id}`}
-          className="text-sm font-bold text-danvers-muted"
-        >
-          ← Back to Competition
+        <Link href="/live" className="text-sm font-bold text-danvers-muted">
+          ← Back to Live
         </Link>
 
         <section className="mt-5 overflow-hidden rounded-[2rem] border border-danvers-border bg-danvers-surface shadow-2xl shadow-black/40">
@@ -233,32 +251,44 @@ export default async function MatchPage({ params }: MatchPageProps) {
               {match.competitions?.name ?? "Match Play"}
             </p>
 
-            <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+            <div className="mt-5 text-center">
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-danvers-muted">
+                Match Status
+              </p>
+
+              <h1
+                className="mt-2 text-5xl font-black leading-none"
+                style={{ color: leaderColor }}
+              >
+                {match.final_result ?? matchScore.shortLabel}
+              </h1>
+
+              <p className="mt-2 text-xl font-black">{heroStatus}</p>
+
+<p className="mt-1 text-xs font-bold uppercase tracking-[0.2em] text-danvers-muted">
+  {match.final_result ? "Final" : `Thru ${holeRows.length}`} · {holeLabel}
+</p>
+            </div>
+
+            <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
               <div
                 className={`rounded-3xl border p-4 ${
                   sideAIsLeading
                     ? "border-danvers-gold bg-danvers-gold/10"
                     : "border-danvers-border bg-black/20"
                 }`}
+                style={{ borderLeftWidth: "6px", borderLeftColor: sideAColor }}
               >
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-danvers-muted">
-                  Side A
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-danvers-brass">
+                  {sideATeamName}
                 </p>
-                <h1 className="mt-2 text-xl font-black leading-tight">
+                <h2 className="mt-2 text-lg font-black leading-tight">
                   {sideAPlayers}
-                </h1>
+                </h2>
               </div>
 
-              <div className="text-center">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-danvers-muted">
-                  Status
-                </p>
-                <p className="mt-1 text-4xl font-black text-danvers-green">
-                  {matchScore.shortLabel}
-                </p>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-danvers-muted">
-                  Thru {holeRows.length}
-                </p>
+              <div className="text-center text-xs font-black uppercase tracking-[0.2em] text-danvers-muted">
+                VS
               </div>
 
               <div
@@ -267,27 +297,66 @@ export default async function MatchPage({ params }: MatchPageProps) {
                     ? "border-danvers-gold bg-danvers-gold/10"
                     : "border-danvers-border bg-black/20"
                 }`}
+                style={{ borderRightWidth: "6px", borderRightColor: sideBColor }}
               >
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-danvers-muted">
-                  Side B
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-danvers-brass">
+                  {sideBTeamName}
                 </p>
-                <h1 className="mt-2 text-xl font-black leading-tight">
+                <h2 className="mt-2 text-lg font-black leading-tight">
                   {sideBPlayers}
-                </h1>
+                </h2>
               </div>
             </div>
+          </div>
+        </section>
 
-            <div className="mt-5 rounded-2xl border border-danvers-border bg-black/25 p-4 text-center">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-danvers-muted">
-                Match Summary
-              </p>
-              <p className="mt-2 text-2xl font-black">
-                {matchScore.label} · {holeLabel}
-              </p>
-              <p className="mt-1 text-sm text-danvers-muted">
-                {match.team_a_name ?? "Team A"} vs {match.team_b_name ?? "Team B"}
-              </p>
-            </div>
+        <section className="mt-6 rounded-[2rem] border border-danvers-border bg-danvers-surface p-5">
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-brass">
+            Hole Timeline
+          </p>
+
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+            {scorecardHoles.map((hole) => {
+              const winner = hole.score?.winning_side;
+              const color =
+                winner === "team_a"
+                  ? sideAColor
+                  : winner === "team_b"
+                    ? sideBColor
+                    : winner === "halved"
+                      ? "#c39b45"
+                      : undefined;
+
+              return (
+                <div
+                  key={hole.holeNumber}
+                  className="flex min-w-14 flex-col items-center rounded-2xl border border-danvers-border bg-black/20 p-3"
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-danvers-muted">
+                    Hole
+                  </p>
+                  <p className="text-xl font-black">{hole.holeNumber}</p>
+
+                  <div
+                    className="mt-2 h-3 w-3 rounded-full border border-danvers-border"
+                    style={{
+                      backgroundColor: color ?? "transparent",
+                      borderColor: color ?? undefined,
+                    }}
+                  />
+
+                  <p className="mt-2 text-[10px] font-bold uppercase text-danvers-muted">
+                    {winner === "team_a"
+                      ? sideATeamName
+                      : winner === "team_b"
+                        ? sideBTeamName
+                        : winner === "halved"
+                          ? "Halved"
+                          : "Open"}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </section>
 
@@ -301,7 +370,7 @@ export default async function MatchPage({ params }: MatchPageProps) {
             </div>
 
             <p className="text-sm font-bold text-danvers-muted">
-              {holeRows.length}/{holeCount} scored
+              {match.final_result ? "Match complete" : `${holeRows.length}/${holeCount} scored`}
             </p>
           </div>
 

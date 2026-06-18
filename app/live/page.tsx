@@ -294,7 +294,17 @@ export default async function LivePage() {
       if (a.holesPlayed > 0 && b.holesPlayed === 0) return -1;
       return a.netToPar - b.netToPar;
     });
-
+    const individualLeader = individualLeaderboard[0];
+const individualLeaderMoment =
+  individualLeader && individualLeader.holesPlayed > 0
+    ? {
+        id: `individual-leader-${individualLeader.playerId}`,
+        text: `${individualLeader.name} leads the individual race`,
+        subtext: `${formatToPar(individualLeader.netToPar)} net · Thru ${
+          individualLeader.holesPlayed
+        }`,
+      }
+    : null;
   const teamLeaderboard = teamRows
     .map((team) => {
       const playerIds = teamMemberRows
@@ -337,22 +347,106 @@ export default async function LivePage() {
       );
     });
 
-  const projectedTeamRace = teamLeaderboard
-    .map((team, index) => {
-      const officialPoints = officialTeamPointMap.get(team.teamId) ?? 0;
+const projectedLivePointMap = new Map<string, number>();
 
-const projectedCurrentRoundPoints =
-  team.scoresEntered > 0 && index === 0
-    ? Number((activeCompetition as any)?.settings?.teamWinnerPoints ?? 1)
-    : 0;
+matchRows.forEach((match) => {
+  const holes = matchHoleRows.filter((hole) => hole.match_id === match.id);
 
-      return {
-        ...team,
-        officialPoints,
-        projectedCurrentRoundPoints,
-        projectedPoints: officialPoints + projectedCurrentRoundPoints,
-      };
-    })
+  if (holes.length === 0) return;
+
+  const competition = competitions?.find(
+    (item) => item.id === match.competition_id
+  );
+
+  const settings = (competition as any)?.settings ?? {};
+
+  const winPoints = Number(settings.matchWinPoints ?? settings.winPoints ?? 1);
+  const tiePoints = Number(settings.matchTiePoints ?? settings.tiePoints ?? 0.5);
+
+  const teamAWins = holes.filter(
+    (hole) => hole.winning_side === "team_a"
+  ).length;
+
+  const teamBWins = holes.filter(
+    (hole) => hole.winning_side === "team_b"
+  ).length;
+if (match.final_result && match.winning_side) {
+  if (match.winning_side === "team_a" && match.team_a_id) {
+    projectedLivePointMap.set(
+      match.team_a_id,
+      (projectedLivePointMap.get(match.team_a_id) ?? 0) + winPoints
+    );
+  }
+
+  if (match.winning_side === "team_b" && match.team_b_id) {
+    projectedLivePointMap.set(
+      match.team_b_id,
+      (projectedLivePointMap.get(match.team_b_id) ?? 0) + winPoints
+    );
+  }
+
+  if (match.winning_side === "halved") {
+    if (match.team_a_id) {
+      projectedLivePointMap.set(
+        match.team_a_id,
+        (projectedLivePointMap.get(match.team_a_id) ?? 0) + tiePoints
+      );
+    }
+
+    if (match.team_b_id) {
+      projectedLivePointMap.set(
+        match.team_b_id,
+        (projectedLivePointMap.get(match.team_b_id) ?? 0) + tiePoints
+      );
+    }
+  }
+
+  return;
+}
+  if (teamAWins > teamBWins && match.team_a_id) {
+    projectedLivePointMap.set(
+      match.team_a_id,
+      (projectedLivePointMap.get(match.team_a_id) ?? 0) + winPoints
+    );
+  }
+
+  if (teamBWins > teamAWins && match.team_b_id) {
+    projectedLivePointMap.set(
+      match.team_b_id,
+      (projectedLivePointMap.get(match.team_b_id) ?? 0) + winPoints
+    );
+  }
+
+  if (teamAWins === teamBWins) {
+    if (match.team_a_id) {
+      projectedLivePointMap.set(
+        match.team_a_id,
+        (projectedLivePointMap.get(match.team_a_id) ?? 0) + tiePoints
+      );
+    }
+
+    if (match.team_b_id) {
+      projectedLivePointMap.set(
+        match.team_b_id,
+        (projectedLivePointMap.get(match.team_b_id) ?? 0) + tiePoints
+      );
+    }
+  }
+});
+
+const projectedTeamRace = teamLeaderboard
+  .map((team) => {
+    const officialPoints = officialTeamPointMap.get(team.teamId) ?? 0;
+    const projectedCurrentRoundPoints =
+      projectedLivePointMap.get(team.teamId) ?? 0;
+
+    return {
+      ...team,
+      officialPoints,
+      projectedCurrentRoundPoints,
+      projectedPoints: officialPoints + projectedCurrentRoundPoints,
+    };
+  })
     .sort((a, b) => {
       if (b.projectedPoints !== a.projectedPoints) {
         return b.projectedPoints - a.projectedPoints;
@@ -362,6 +456,24 @@ const projectedCurrentRoundPoints =
     });
 
   const projectedTeamLeader = projectedTeamRace[0];
+  const fallbackTotalTeamPoints = Math.max(
+  1,
+  ...projectedTeamRace.map((team) => Number(team.projectedPoints ?? 0))
+);
+
+const totalTeamPointsAvailable =
+  Number((season as any)?.total_team_points_available ?? 0) ||
+  fallbackTotalTeamPoints;
+
+const teamPointsNeededToWin =
+  Number((season as any)?.team_points_needed_to_win ?? 0) || null;
+
+const winLinePercent = teamPointsNeededToWin
+  ? Math.min(
+      100,
+      Math.max(0, (teamPointsNeededToWin / totalTeamPointsAvailable) * 100)
+    )
+  : null;
 
   const recentScores = [...scoreRows]
     .filter((score) => score.updated_at)
@@ -370,6 +482,30 @@ const projectedCurrentRoundPoints =
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     )
     .slice(0, 5);
+    const recentMatchMoments = matchHoleRows
+  .filter((hole) => hole.winning_side === "team_a" || hole.winning_side === "team_b")
+  .sort((a, b) => Number(b.hole_number) - Number(a.hole_number))
+  .slice(0, 3)
+  .map((hole) => {
+    const match = matchRows.find((row) => row.id === hole.match_id);
+
+const leaderPlayerIds =
+  hole.winning_side === "team_a"
+    ? match?.team_a_player_ids ?? []
+    : match?.team_b_player_ids ?? [];
+
+const leader =
+  playerNames(leaderPlayerIds, playerRows) ??
+  (hole.winning_side === "team_a"
+    ? match?.team_a_name ?? "Team A"
+    : match?.team_b_name ?? "Team B");
+
+    return {
+      id: `${hole.match_id}-${hole.hole_number}`,
+      text: `${leader} wins Hole ${hole.hole_number}`,
+      subtext: `Match swing · Hole ${hole.hole_number}`,
+    };
+  });
 
   const expectedScores = playerRows.length * 18;
   const progressPercent =
@@ -463,6 +599,26 @@ const projectedCurrentRoundPoints =
     </Link>
   </div>
 
+   {projectedTeamRace.length > 0 ? (
+    <div className="mt-4 grid gap-3 rounded-3xl border border-danvers-border bg-black/20 p-4 sm:grid-cols-2">
+      {projectedTeamRace.map((team) => (
+        <div key={team.teamId}>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-danvers-muted">
+            {team.name}
+          </p>
+
+          <p className="mt-1 text-3xl font-black">
+            {team.projectedCurrentRoundPoints}
+          </p>
+
+          <p className="text-xs uppercase tracking-[0.16em] text-danvers-muted">
+            projected match pts
+          </p>
+        </div>
+      ))}
+    </div>
+  ) : null}
+
   <div className="mt-4 grid gap-3">
     {matchRows.length ? (
       matchRows.map((match) => {
@@ -482,13 +638,24 @@ const projectedCurrentRoundPoints =
           (hole) => hole.winning_side === "team_b"
         ).length;
 
-        const margin = Math.abs(teamAWins - teamBWins);
+const margin = Math.abs(teamAWins - teamBWins);
+const isFinal = Boolean(match.final_result && match.winning_side);
 
-        const status =
-          holes.length === 0 || margin === 0 ? "AS" : `${margin} UP`;
+const status = isFinal
+  ? match.winning_side === "halved"
+    ? "AS"
+    : match.final_result
+  : holes.length === 0 || margin === 0
+    ? "AS"
+    : `${margin} UP`;
 
-        const sideAIsLeading = teamAWins > teamBWins;
-        const sideBIsLeading = teamBWins > teamAWins;
+const sideAIsLeading = isFinal
+  ? match.winning_side === "team_a"
+  : teamAWins > teamBWins;
+
+const sideBIsLeading = isFinal
+  ? match.winning_side === "team_b"
+  : teamBWins > teamAWins;
 
         const sideAPlayers =
           playerNames(match.team_a_player_ids ?? [], playerRows) ??
@@ -543,21 +710,25 @@ const projectedCurrentRoundPoints =
                 </p>
               </div>
 
-              <div className="text-center">
-                {leaderName && (
-                  <p className="mb-1 truncate text-[10px] font-black uppercase tracking-[0.12em] text-danvers-gold">
-                    {leaderName}
-                  </p>
-                )}
+<div className="text-center">
+  {isFinal ? (
+    <p className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-danvers-gold">
+      Final
+    </p>
+  ) : leaderName ? (
+    <p className="mb-1 truncate text-[10px] font-black uppercase tracking-[0.12em] text-danvers-gold">
+      {leaderName}
+    </p>
+  ) : null}
 
-                <p className="text-5xl font-black leading-none text-danvers-green">
-                  {status}
-                </p>
+  <p className="text-5xl font-black leading-none text-danvers-green">
+    {status}
+  </p>
 
-                <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-danvers-muted">
-                  Thru {holes.length}
-                </p>
-              </div>
+  <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-danvers-muted">
+    {isFinal ? "Match Complete" : `Thru ${holes.length}`}
+  </p>
+</div>
 
               <div
                 className={`rounded-2xl border p-3 text-right ${
@@ -599,38 +770,38 @@ const projectedCurrentRoundPoints =
     Team Race
   </p>
 
-  <div className="mt-4 rounded-3xl border border-danvers-border bg-gradient-to-br from-danvers-green/20 to-black/20 p-5">
+  <div className="mt-4 rounded-3xl border border-danvers-border bg-gradient-to-br from-danvers-green/20 to-black/20 p-4">
     <p className="text-xs font-bold uppercase tracking-[0.2em] text-danvers-muted">
-      If Scores Hold
+      If Matches Hold
     </p>
 
-    <h2 className="mt-2 text-4xl font-black">
+    <h2 className="mt-2 text-3xl font-black">
       {projectedTeamLeader?.name ?? "Pending"}
     </h2>
+{projectedTeamRace.length > 1 ? (
+  <p className="text-sm font-medium text-danvers-muted">
+    {projectedTeamRace[0].projectedPoints ===
+    projectedTeamRace[1].projectedPoints
+      ? `Tied with ${projectedTeamRace[1].name}`
+      : `Leads ${projectedTeamRace[1].name} by ${
+          projectedTeamRace[0].projectedPoints -
+          projectedTeamRace[1].projectedPoints
+        }`}
+  </p>
+) : null}
+    <div className="mt-4 grid gap-3">
+      {projectedTeamRace.map((team) => {
+        const rawBarPercent =
+  totalTeamPointsAvailable > 0
+    ? Math.round(
+        (Number(team.projectedPoints ?? 0) / totalTeamPointsAvailable) * 100
+      )
+    : 0;
 
-    {projectedTeamRace.length > 1 && (
-      <p className="mt-2 text-lg text-danvers-muted">
-        {projectedTeamRace[0].projectedPoints ===
-        projectedTeamRace[1].projectedPoints
-          ? `Tied with ${projectedTeamRace[1].name}`
-          : `+${
-              projectedTeamRace[0].projectedPoints -
-              projectedTeamRace[1].projectedPoints
-            } ahead of ${projectedTeamRace[1].name}`}
-      </p>
-    )}
-
-    <div className="mt-5 grid gap-3">
-      {projectedTeamRace.map((team, index) => {
-        const maxProjectedPoints = Math.max(
-          1,
-          ...projectedTeamRace.map((row) => Number(row.projectedPoints ?? 0))
-        );
-
-        const barPercent = Math.max(
-          6,
-          Math.round((Number(team.projectedPoints ?? 0) / maxProjectedPoints) * 100)
-        );
+const barPercent =
+  Number(team.projectedPoints ?? 0) <= 0
+    ? 0
+    : Math.max(2, Math.min(100, rawBarPercent));
 
         return (
           <Link
@@ -644,7 +815,7 @@ const projectedCurrentRoundPoints =
                 <p className="text-xs text-danvers-muted">
                   Official {team.officialPoints} pts
                   {team.projectedCurrentRoundPoints > 0
-                    ? ` · Live +${team.projectedCurrentRoundPoints}`
+                    ? ` · Projected match pts +${team.projectedCurrentRoundPoints}`
                     : ""}
                 </p>
               </div>
@@ -657,7 +828,7 @@ const projectedCurrentRoundPoints =
               </div>
             </div>
 
-            <div className="mt-4 h-3 overflow-hidden rounded-full bg-black/50">
+            <div className="relative mt-4 h-4 overflow-hidden rounded-full bg-black/50">
               <div
                 className="h-full rounded-full bg-danvers-green"
                 style={{
@@ -665,6 +836,21 @@ const projectedCurrentRoundPoints =
                   backgroundColor: team.color ?? undefined,
                 }}
               />
+
+              {winLinePercent !== null ? (
+                <div
+                  className="absolute top-0 h-full w-1 bg-danvers-gold"
+                  style={{ left: `${winLinePercent}%` }}
+                />
+              ) : null}
+            </div>
+
+            <div className="mt-2 flex justify-between text-[10px] font-black uppercase tracking-[0.16em] text-danvers-muted">
+              <span>{team.projectedPoints} pts</span>
+              {teamPointsNeededToWin ? (
+                <span>{teamPointsNeededToWin} to win</span>
+              ) : null}
+              <span>{totalTeamPointsAvailable} max</span>
             </div>
           </Link>
         );
@@ -779,34 +965,78 @@ const projectedCurrentRoundPoints =
   </p>
 
   <div className="mt-4 grid gap-3">
-    {recentScores.length ? (
-      recentScores.map((score: any, index) => {
+    {recentScores.length || recentMatchMoments.length || individualLeaderMoment ? (
+  <>
+  {individualLeaderMoment ? (
+  <div
+    key={individualLeaderMoment.id}
+    className="rounded-2xl border border-l-4 border-danvers-border border-l-danvers-gold bg-danvers-gold/10 p-4"
+  >
+    <p className="font-black">🏆 {individualLeaderMoment.text}</p>
+    <p className="mt-1 text-sm text-danvers-muted">
+      {individualLeaderMoment.subtext}
+    </p>
+  </div>
+) : null}
+    {recentMatchMoments.map((moment) => (
+      <div
+        key={moment.id}
+        className="rounded-2xl border border-l-4 border-danvers-border border-l-danvers-gold bg-danvers-gold/10 p-4"
+      >
+        <p className="font-black">🔥 {moment.text}</p>
+        <p className="mt-1 text-sm text-danvers-muted">{moment.subtext}</p>
+      </div>
+    ))}
+
+    {recentScores.map((score: any, index) => {
         const player = playerRows.find(
           (row) => row.player_id === score.player_id
         );
 
         const par = parByHole.get(score.hole_number);
-const label = getScoreLabel(Number(score.gross_score), par);
-const activityStyle = getScoreActivityStyle(Number(score.gross_score), par);
+        const grossScore = Number(score.gross_score);
+        const label = getScoreLabel(grossScore, par);
+        const activityStyle = getScoreActivityStyle(grossScore, par);
+
+        const diff = par ? grossScore - Number(par) : null;
+
+        const resultText =
+          diff === null
+            ? `Score ${grossScore}`
+            : diff === 0
+              ? `Even on Hole ${score.hole_number}`
+              : diff > 0
+                ? `${formatToPar(diff)} on Hole ${score.hole_number}`
+                : `${formatToPar(diff)} on Hole ${score.hole_number}`;
 
         return (
           <div
             key={`${score.player_id}-${score.hole_number}-${index}`}
             className={`rounded-2xl border p-4 ${activityStyle.className}`}
           >
-            <p className="font-black">
-              {activityStyle.icon} {player?.players?.full_name ?? "Unknown Player"} {label} Hole{" "}
-{score.hole_number}
-            </p>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-black">
+                  {activityStyle.icon}{" "}
+                  {player?.players?.full_name ?? "Unknown Player"} {label} Hole{" "}
+                  {score.hole_number}
+                </p>
 
-            <p className="mt-1 text-sm text-danvers-muted">
-              Score {score.gross_score}
-              {par ? ` · Par ${par}` : ""}
-            </p>
+                <p className="mt-1 text-sm text-danvers-muted">
+                  Score {grossScore}
+                  {par ? ` · Par ${par}` : ""}
+                </p>
+              </div>
+
+              <p className="shrink-0 rounded-full border border-danvers-border bg-black/20 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-danvers-muted">
+                {resultText}
+              </p>
+            </div>
           </div>
         );
-      })
-    ) : (
+      })}
+  </>
+) : (
       <p className="rounded-2xl border border-danvers-border bg-black/20 p-4 text-danvers-muted">
         No recent score activity.
       </p>

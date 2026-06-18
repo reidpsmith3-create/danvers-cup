@@ -156,7 +156,13 @@ export default async function ScoreEntryPage({
         </div>
 
         {round ? (
-          <ScoreEntryForm roundId={round.id} players={scorePlayers} holes={holes} />
+<ScoreEntryForm
+  roundId={round.id}
+  groupId={selectedGroup?.id ?? null}
+  groupName={selectedGroup?.name ?? null}
+  players={scorePlayers}
+  holes={holes}
+/>
         ) : (
           <p className="mt-6 text-danvers-muted">No round found.</p>
         )}

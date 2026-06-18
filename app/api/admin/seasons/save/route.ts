@@ -21,17 +21,25 @@ export async function POST(request: Request) {
     );
   }
 
-  const payload = {
-    year,
-    name,
-    location: String(body.location ?? "").trim() || null,
-    start_date: String(body.startDate ?? "").trim() || null,
-    end_date: String(body.endDate ?? "").trim() || null,
-    status: String(body.status ?? "upcoming"),
-    team_champion_name: String(body.teamChampionName ?? "").trim() || null,
-    individual_champion_name:
-      String(body.individualChampionName ?? "").trim() || null,
-  };
+const payload = {
+  year,
+  name,
+  location: String(body.location ?? "").trim() || null,
+  start_date: String(body.startDate ?? "").trim() || null,
+  end_date: String(body.endDate ?? "").trim() || null,
+  status: String(body.status ?? "upcoming"),
+  team_champion_name: String(body.teamChampionName ?? "").trim() || null,
+  individual_champion_name:
+    String(body.individualChampionName ?? "").trim() || null,
+  total_team_points_available:
+    body.totalTeamPointsAvailable === ""
+      ? null
+      : Number(body.totalTeamPointsAvailable),
+  team_points_needed_to_win:
+    body.teamPointsNeededToWin === ""
+      ? null
+      : Number(body.teamPointsNeededToWin),
+};
 
   if (body.id) {
     const { data, error } = await supabase

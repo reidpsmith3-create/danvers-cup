@@ -6,9 +6,7 @@ function StatusBadge({ ok }: { ok: boolean }) {
   return (
     <span
       className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.15em] ${
-        ok
-          ? "bg-green-600/20 text-green-300"
-          : "bg-red-600/20 text-red-300"
+        ok ? "bg-green-600/20 text-green-300" : "bg-red-600/20 text-red-300"
       }`}
     >
       {ok ? "Ready" : "Needs Work"}
@@ -50,6 +48,22 @@ export default async function AdminSiteHealthPage() {
     .select("id, course_id, round_date, tee_time")
     .eq("season_id", season?.id);
 
+  const roundIds = rounds?.map((round) => round.id) ?? [];
+  const courseIds = rounds?.map((round) => round.course_id).filter(Boolean) ?? [];
+  const { data: tripInfoSections } = await supabase
+  .from("trip_info_sections")
+  .select("id")
+  .eq("season_id", season?.id)
+  .eq("is_visible", true);
+
+  const { data: courseHoles } =
+    courseIds.length > 0
+      ? await supabase
+          .from("course_holes")
+          .select("course_id, hole_number")
+          .in("course_id", courseIds)
+      : { data: [] };
+
   const { data: teams } = await supabase
     .from("teams")
     .select("id")
@@ -67,13 +81,56 @@ export default async function AdminSiteHealthPage() {
 
   const { data: seasonPlayers } = await supabase
     .from("season_players")
-    .select("id, handicap")
+    .select("id, player_id, handicap")
     .eq("season_id", season?.id);
 
   const { data: competitions } = await supabase
     .from("competitions")
-    .select("id")
+    .select("id, round_id")
     .eq("season_id", season?.id);
+
+  const competitionIds = competitions?.map((competition) => competition.id) ?? [];
+
+  const { data: matches } =
+    competitionIds.length > 0
+      ? await supabase
+          .from("matches")
+          .select("id, competition_id")
+          .in("competition_id", competitionIds)
+      : { data: [] };
+
+  const { data: groups } =
+    roundIds.length > 0
+      ? await supabase
+          .from("round_groups")
+          .select("id, round_id")
+          .in("round_id", roundIds)
+      : { data: [] };
+
+  const { data: liveRounds } = await supabase
+  .from("rounds")
+  .select("id")
+  .eq("season_id", season?.id)
+  .eq("status", "live");
+
+const { data: scoreRows } =
+  roundIds.length > 0
+    ? await supabase
+        .from("scores")
+        .select("id, round_id")
+        .in("round_id", roundIds)
+        .limit(1)
+    : { data: [] };
+
+  const groupIds = groups?.map((group) => group.id) ?? [];
+
+  const { data: groupPlayers } =
+    groupIds.length > 0
+      ? await supabase
+          .from("group_players")
+          .select("group_id, player_id")
+          .in("group_id", groupIds)
+      : { data: [] };
 
   const { data: scheduleEvents } = await supabase
     .from("schedule_events")
@@ -87,7 +144,17 @@ export default async function AdminSiteHealthPage() {
       (round) => round.course_id && round.round_date && round.tee_time
     ).length ?? 0;
 
+  const uniqueCourseIds = Array.from(new Set(courseIds));
+  const coursesWith18Holes = uniqueCourseIds.filter((courseId) => {
+    const holesForCourse =
+      courseHoles?.filter((hole: any) => hole.course_id === courseId).length ??
+      0;
+
+    return holesForCourse >= 18;
+  }).length;
+
   const teamsCount = teams?.length ?? 0;
+
   const rosteredPlayerIds = new Set(
     ((teamMembers as { player_id: string }[] | null) ?? []).map(
       (member) => member.player_id
@@ -97,6 +164,12 @@ export default async function AdminSiteHealthPage() {
   const playersCount = seasonPlayers?.length ?? 0;
   const missingHandicaps =
     seasonPlayers?.filter((player) => player.handicap === null).length ?? 0;
+
+  const groupPlayerIds = new Set(
+    ((groupPlayers as { player_id: string }[] | null) ?? []).map(
+      (player) => player.player_id
+    )
+  );
 
   const checks = [
     {
@@ -108,10 +181,16 @@ export default async function AdminSiteHealthPage() {
       href: "/admin/seasons",
     },
     {
-      label: "Rounds",
-      detail: `${completeRoundsCount} of ${roundsCount} rounds have course, date, and tee time.`,
-      ok: roundsCount > 0 && completeRoundsCount === roundsCount,
-      href: "/admin/rounds",
+      label: "Players",
+      detail: `${playersCount} players assigned to the current season.`,
+      ok: playersCount > 0,
+      href: "/admin/players",
+    },
+    {
+      label: "Player Handicaps",
+      detail: `${missingHandicaps} players missing handicaps.`,
+      ok: playersCount > 0 && missingHandicaps === 0,
+      href: "/admin/players",
     },
     {
       label: "Teams",
@@ -126,10 +205,16 @@ export default async function AdminSiteHealthPage() {
       href: "/admin/teams",
     },
     {
-      label: "Player Handicaps",
-      detail: `${missingHandicaps} players missing handicaps.`,
-      ok: playersCount > 0 && missingHandicaps === 0,
-      href: "/admin/players",
+      label: "Rounds",
+      detail: `${completeRoundsCount} of ${roundsCount} rounds have course, date, and tee time.`,
+      ok: roundsCount > 0 && completeRoundsCount === roundsCount,
+      href: "/admin/rounds",
+    },
+    {
+      label: "Course Scorecards",
+      detail: `${coursesWith18Holes} of ${uniqueCourseIds.length} courses have 18 holes loaded.`,
+      ok: uniqueCourseIds.length > 0 && coursesWith18Holes === uniqueCourseIds.length,
+      href: "/admin/courses",
     },
     {
       label: "Competitions",
@@ -137,6 +222,45 @@ export default async function AdminSiteHealthPage() {
       ok: (competitions?.length ?? 0) > 0,
       href: "/admin/competitions",
     },
+    {
+      label: "Matches",
+      detail: `${matches?.length ?? 0} matches created.`,
+      ok: (matches?.length ?? 0) > 0,
+      href: "/admin/matches",
+    },
+    {
+      label: "Groups / Pairings",
+      detail: `${groups?.length ?? 0} groups created. ${groupPlayerIds.size} of ${playersCount} players assigned to groups.`,
+      ok:
+        (groups?.length ?? 0) > 0 &&
+        playersCount > 0 &&
+        groupPlayerIds.size === playersCount,
+      href: "/admin/groups",
+    },
+    {
+  label: "Live Scoring",
+  detail:
+    (groups?.length ?? 0) > 0
+      ? `${groups?.length ?? 0} groups available for score entry.`
+      : "No groups available for score entry.",
+  ok: (groups?.length ?? 0) > 0,
+  href: "/score-entry",
+},
+{
+  label: "Round Status",
+  detail:
+    (liveRounds?.length ?? 0) === 1
+      ? "Exactly one live round selected."
+      : `${liveRounds?.length ?? 0} rounds marked live.`,
+  ok: (liveRounds?.length ?? 0) <= 1,
+  href: "/admin/rounds",
+},
+    {
+  label: "Trip Info",
+  detail: `${tripInfoSections?.length ?? 0} visible trip info cards added.`,
+  ok: (tripInfoSections?.length ?? 0) > 0,
+  href: "/admin/trip-info",
+},
     {
       label: "Trip Events",
       detail: `${scheduleEvents?.length ?? 0} visible non-golf events added.`,
@@ -146,6 +270,7 @@ export default async function AdminSiteHealthPage() {
   ];
 
   const readyCount = checks.filter((check) => check.ok).length;
+  const percent = Math.round((readyCount / checks.length) * 100);
 
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
@@ -159,7 +284,7 @@ export default async function AdminSiteHealthPage() {
 
         <div className="mt-6 rounded-[2rem] border border-danvers-green/30 bg-danvers-surface/80 p-6">
           <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
-            Admin
+            Commissioner Readiness
           </p>
 
           <h1 className="mt-2 text-4xl font-black">Site Health</h1>
@@ -171,9 +296,7 @@ export default async function AdminSiteHealthPage() {
           <div className="mt-5 h-3 overflow-hidden rounded-full bg-black/40">
             <div
               className="h-full rounded-full bg-danvers-green"
-              style={{
-                width: `${Math.round((readyCount / checks.length) * 100)}%`,
-              }}
+              style={{ width: `${percent}%` }}
             />
           </div>
         </div>

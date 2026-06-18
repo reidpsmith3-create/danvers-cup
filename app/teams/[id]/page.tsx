@@ -176,8 +176,14 @@ export default async function TeamPage({ params }: TeamPageProps) {
     (a, b) => b.matchWins - a.matchWins
   )[0];
 
-  const teamRecord = getMatchRecord(team.id, visibleSeasonMatches);
-  const teamColor = team.color || "#1f7a4d";
+const teamRecord = getMatchRecord(team.id, visibleSeasonMatches);
+
+const totalHandicap = playerRows.reduce((total, player) => {
+  const handicap = handicapByPlayerId.get(player.id);
+  return total + Number(handicap ?? 0);
+}, 0);
+
+const teamColor = team.color || "#1f7a4d";
   const opponent = ((otherTeams as any[]) ?? [])[0];
 
   const headToHeadMatches = opponent
@@ -253,7 +259,7 @@ export default async function TeamPage({ params }: TeamPageProps) {
                 </div>
               </div>
 
-              <div className="mt-8 grid grid-cols-3 gap-3">
+              <div className="mt-8 grid grid-cols-4 gap-3">
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-danvers-muted">
                     Players
@@ -262,7 +268,14 @@ export default async function TeamPage({ params }: TeamPageProps) {
                     {playerRows.length}
                   </p>
                 </div>
-
+<div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
+  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-danvers-muted">
+    HCP
+  </p>
+  <p className="mt-2 text-2xl font-black text-danvers-gold">
+    {totalHandicap.toFixed(1)}
+  </p>
+</div>
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-danvers-muted">
                     Points
