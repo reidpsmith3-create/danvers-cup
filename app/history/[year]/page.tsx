@@ -125,43 +125,12 @@ export default async function HistorySeasonPage({
     getSingleRelation(seasonResult?.players)?.full_name ??
     "Pending";
 
-  const { data: seasonPlayers } = await supabase
-    .from("season_players")
-    .select("player_id, team_id")
-    .eq("season_id", season.id);
-
-  const teamIds = Array.from(
-    new Set(
-      ((seasonPlayers as any[]) ?? [])
-        .map((row) => row.team_id)
-        .filter(Boolean)
-    )
-  );
-
-  const { data: seasonTeams } =
-    teamIds.length > 0
-      ? await supabase
-          .from("teams")
-          .select("id, name")
-          .in("id", teamIds)
-      : { data: [] };
-
-  const teamNameById = new Map<string, string>(
-    ((seasonTeams as any[]) ?? []).map((team) => [team.id, team.name])
-  );
-
-  const teamIdByPlayerId = new Map<string, string>(
-    ((seasonPlayers as any[]) ?? [])
-      .filter((row) => row.player_id && row.team_id)
-      .map((row) => [row.player_id, row.team_id])
-  );
-
   const { data: officialMatches } =
     competitionIds.length > 0
       ? await supabase
           .from("matches")
           .select(
-            "competition_id, team_a_player_ids, team_b_player_ids, winning_side, is_official"
+            "competition_id, team_a_name, team_b_name, winning_side, is_official"
           )
           .in("competition_id", competitionIds)
           .eq("is_official", true)
@@ -170,45 +139,35 @@ export default async function HistorySeasonPage({
   const teamStandingsMap = new Map<string, number>();
 
   ((officialMatches as any[]) ?? []).forEach((match) => {
-    const teamAPlayerId = match.team_a_player_ids?.[0];
-    const teamBPlayerId = match.team_b_player_ids?.[0];
-
-    const teamAId = teamAPlayerId
-      ? teamIdByPlayerId.get(teamAPlayerId)
-      : null;
-
-    const teamBId = teamBPlayerId
-      ? teamIdByPlayerId.get(teamBPlayerId)
-      : null;
-
-    const teamAName = teamAId ? teamNameById.get(teamAId) : null;
-    const teamBName = teamBId ? teamNameById.get(teamBId) : null;
+    const teamAName = match.team_a_name;
+    const teamBName = match.team_b_name;
 
     if (!teamAName || !teamBName) return;
+
+    if (!teamStandingsMap.has(teamAName)) {
+      teamStandingsMap.set(teamAName, 0);
+    }
+
+    if (!teamStandingsMap.has(teamBName)) {
+      teamStandingsMap.set(teamBName, 0);
+    }
 
     if (match.winning_side === "team_a") {
       teamStandingsMap.set(
         teamAName,
         (teamStandingsMap.get(teamAName) ?? 0) + 1
       );
-      teamStandingsMap.set(
-        teamBName,
-        teamStandingsMap.get(teamBName) ?? 0
-      );
     } else if (match.winning_side === "team_b") {
       teamStandingsMap.set(
         teamBName,
         (teamStandingsMap.get(teamBName) ?? 0) + 1
-      );
-      teamStandingsMap.set(
-        teamAName,
-        teamStandingsMap.get(teamAName) ?? 0
       );
     } else if (match.winning_side === "halved") {
       teamStandingsMap.set(
         teamAName,
         (teamStandingsMap.get(teamAName) ?? 0) + 0.5
       );
+
       teamStandingsMap.set(
         teamBName,
         (teamStandingsMap.get(teamBName) ?? 0) + 0.5
