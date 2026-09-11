@@ -50,7 +50,7 @@ function getSeasonRecap(year: number) {
 
   return `The inaugural Danvers Cup was held in Phoenix, Arizona from November 10-14, 2024.
 
-The American Team captured the first team championship, finishing with 6.5 points to National's 4.5.
+The American Team captured the first team championship, finishing with 7.5 points to National's 4.5.
 
 Neil Birky won the first individual title with 3.5 points, holding off Taylor Marvin and Ryan Smith.
 
@@ -125,16 +125,96 @@ export default async function HistorySeasonPage({
     getSingleRelation(seasonResult?.players)?.full_name ??
     "Pending";
 
+  const { data: seasonPlayers } = await supabase
+    .from("season_players")
+    .select("player_id, team_id")
+    .eq("season_id", season.id);
+
+  const teamIds = Array.from(
+    new Set(
+      ((seasonPlayers as any[]) ?? [])
+        .map((row) => row.team_id)
+        .filter(Boolean)
+    )
+  );
+
+  const { data: seasonTeams } =
+    teamIds.length > 0
+      ? await supabase
+          .from("teams")
+          .select("id, name")
+          .in("id", teamIds)
+      : { data: [] };
+
+  const teamNameById = new Map<string, string>(
+    ((seasonTeams as any[]) ?? []).map((team) => [team.id, team.name])
+  );
+
+  const teamIdByPlayerId = new Map<string, string>(
+    ((seasonPlayers as any[]) ?? [])
+      .filter((row) => row.player_id && row.team_id)
+      .map((row) => [row.player_id, row.team_id])
+  );
+
+  const { data: officialMatches } =
+    competitionIds.length > 0
+      ? await supabase
+          .from("matches")
+          .select(
+            "competition_id, team_a_player_ids, team_b_player_ids, winning_side, is_official"
+          )
+          .in("competition_id", competitionIds)
+          .eq("is_official", true)
+      : { data: [] };
+
   const teamStandingsMap = new Map<string, number>();
 
-  resultRows
-    .filter((result) => result.team_id)
-    .forEach((result) => {
-      const name = getSingleRelation(result.teams)?.name ?? "Unknown Team";
-      const current = teamStandingsMap.get(name) ?? 0;
+  ((officialMatches as any[]) ?? []).forEach((match) => {
+    const teamAPlayerId = match.team_a_player_ids?.[0];
+    const teamBPlayerId = match.team_b_player_ids?.[0];
 
-      teamStandingsMap.set(name, current + Number(result.points ?? 0));
-    });
+    const teamAId = teamAPlayerId
+      ? teamIdByPlayerId.get(teamAPlayerId)
+      : null;
+
+    const teamBId = teamBPlayerId
+      ? teamIdByPlayerId.get(teamBPlayerId)
+      : null;
+
+    const teamAName = teamAId ? teamNameById.get(teamAId) : null;
+    const teamBName = teamBId ? teamNameById.get(teamBId) : null;
+
+    if (!teamAName || !teamBName) return;
+
+    if (match.winning_side === "team_a") {
+      teamStandingsMap.set(
+        teamAName,
+        (teamStandingsMap.get(teamAName) ?? 0) + 1
+      );
+      teamStandingsMap.set(
+        teamBName,
+        teamStandingsMap.get(teamBName) ?? 0
+      );
+    } else if (match.winning_side === "team_b") {
+      teamStandingsMap.set(
+        teamBName,
+        (teamStandingsMap.get(teamBName) ?? 0) + 1
+      );
+      teamStandingsMap.set(
+        teamAName,
+        teamStandingsMap.get(teamAName) ?? 0
+      );
+    } else if (match.winning_side === "halved") {
+      teamStandingsMap.set(
+        teamAName,
+        (teamStandingsMap.get(teamAName) ?? 0) + 0.5
+      );
+      teamStandingsMap.set(
+        teamBName,
+        (teamStandingsMap.get(teamBName) ?? 0) + 0.5
+      );
+    }
+  });
 
   const teamStandings: [string, number][] = Array.from(
     teamStandingsMap.entries()
