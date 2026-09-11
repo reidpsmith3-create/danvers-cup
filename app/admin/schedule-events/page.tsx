@@ -2,6 +2,9 @@ import Link from "next/link";
 import { getCurrentSeason } from "@/lib/currentSeason";
 import { supabase } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type ScheduleEvent = {
   id: string;
   title: string;
