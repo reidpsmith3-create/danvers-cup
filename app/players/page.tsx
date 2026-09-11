@@ -2,6 +2,9 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getCurrentSeason } from "@/lib/currentSeason";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type PlayersPageProps = {
   searchParams?: {
     tab?: string;
