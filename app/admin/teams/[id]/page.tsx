@@ -3,6 +3,9 @@ import TeamForm from "@/components/admin/TeamForm";
 import { supabase } from "@/lib/supabase";
 import { getCurrentSeason } from "@/lib/currentSeason";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type AdminTeamEditPageProps = {
   params: {
     id: string;
