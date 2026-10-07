@@ -106,7 +106,7 @@ export default async function ScoreEntryPage({
             {round?.name ?? "Round 1"} · {round?.courses?.name ?? "Course TBD"}
           </p>
 
-          <div className="mt-6 grid grid-cols-3 gap-2">
+          <div className="mt-6 grid grid-cols-3 gap-2 sm:grid-cols-6">
             {rounds?.map((roundOption) => {
               const isActive =
                 roundOption.round_number === round?.round_number;
@@ -115,13 +115,18 @@ export default async function ScoreEntryPage({
                 <Link
                   key={roundOption.id}
                   href={`/score-entry?round=${roundOption.round_number}`}
-                  className={`rounded-2xl px-4 py-3 text-center text-sm font-black ${
+                  className={`flex min-h-[64px] flex-col items-center justify-center rounded-2xl px-2 py-3 text-center ${
                     isActive
                       ? "bg-danvers-green text-white"
                       : "border border-danvers-border bg-black/20 text-danvers-muted"
                   }`}
                 >
-                  Round {roundOption.round_number}
+                  <span className="text-sm font-black">
+                    Round {roundOption.round_number}
+                  </span>
+                  <span className="mt-1 text-[10px] font-bold opacity-70">
+                    {roundOption.name}
+                  </span>
                 </Link>
               );
             })}
