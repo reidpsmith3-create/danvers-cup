@@ -301,51 +301,53 @@ nineType: holeCount === "9" ? nineType : null,
           />
         </label>
 
-        <div className="grid gap-4 sm:grid-cols-4">
-          <label className="grid gap-2">
-            <span className="text-sm font-bold text-danvers-muted">
-              1st Place
-            </span>
-            <input
-              value={pointsForFirst}
-              onChange={(event) => setPointsForFirst(event.target.value)}
-              className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
-            />
-          </label>
+        {format !== "vegas" ? (
+          <div className="grid gap-4 sm:grid-cols-4">
+            <label className="grid gap-2">
+              <span className="text-sm font-bold text-danvers-muted">
+                1st Place
+              </span>
+              <input
+                value={pointsForFirst}
+                onChange={(event) => setPointsForFirst(event.target.value)}
+                className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+              />
+            </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-bold text-danvers-muted">
-              2nd Place
-            </span>
-            <input
-              value={pointsForSecond}
-              onChange={(event) => setPointsForSecond(event.target.value)}
-              className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
-            />
-          </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-bold text-danvers-muted">
+                2nd Place
+              </span>
+              <input
+                value={pointsForSecond}
+                onChange={(event) => setPointsForSecond(event.target.value)}
+                className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+              />
+            </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-bold text-danvers-muted">
-              3rd Place
-            </span>
-            <input
-              value={pointsForThird}
-              onChange={(event) => setPointsForThird(event.target.value)}
-              className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
-            />
-          </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-bold text-danvers-muted">
+                3rd Place
+              </span>
+              <input
+                value={pointsForThird}
+                onChange={(event) => setPointsForThird(event.target.value)}
+                className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+              />
+            </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-bold text-danvers-muted">
-              4th Place
-            </span>
-            <input
-              value={pointsForFourth}
-              onChange={(event) => setPointsForFourth(event.target.value)}
-              className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
-            />
-          </label>
-        </div>
+            <label className="grid gap-2">
+              <span className="text-sm font-bold text-danvers-muted">
+                4th Place
+              </span>
+              <input
+                value={pointsForFourth}
+                onChange={(event) => setPointsForFourth(event.target.value)}
+                className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+              />
+            </label>
+          </div>
+        ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="grid gap-2">
@@ -371,21 +373,23 @@ nineType: holeCount === "9" ? nineType : null,
           </label>
         </div>
 
-        <label className="grid gap-2">
-          <span className="text-sm font-bold text-danvers-muted">
-            Team Scoring Method
-          </span>
-          <select
-            value={teamScoringMethod}
-            onChange={(event) => setTeamScoringMethod(event.target.value)}
-            className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
-          >
-            <option value="best_1_total">Best 1 player total</option>
-            <option value="best_2_total">Best 2 player totals</option>
-            <option value="best_3_total">Best 3 player totals</option>
-            <option value="all_players_total">All player totals</option>
-          </select>
-        </label>
+        {format !== "vegas" ? (
+          <label className="grid gap-2">
+            <span className="text-sm font-bold text-danvers-muted">
+              Team Scoring Method
+            </span>
+            <select
+              value={teamScoringMethod}
+              onChange={(event) => setTeamScoringMethod(event.target.value)}
+              className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+            >
+              <option value="best_1_total">Best 1 player total</option>
+              <option value="best_2_total">Best 2 player totals</option>
+              <option value="best_3_total">Best 3 player totals</option>
+              <option value="all_players_total">All player totals</option>
+            </select>
+          </label>
+        ) : null}
 
         <label className="flex items-center gap-3 text-sm font-bold">
           <input
