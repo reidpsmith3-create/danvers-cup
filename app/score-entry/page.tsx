@@ -3,6 +3,9 @@ import { supabase } from "@/lib/supabase";
 import ScoreEntryForm from "@/components/score-entry/ScoreEntryForm";
 import { getCurrentSeason } from "@/lib/currentSeason";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type ScoreEntryPageProps = {
   searchParams?: {
     round?: string;
