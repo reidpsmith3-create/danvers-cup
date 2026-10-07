@@ -705,6 +705,13 @@ const winLinePercent = teamPointsNeededToWin
           (hole) => hole.winning_side === "team_b"
         ).length;
 
+        const latestHole =
+          holes.length > 0
+            ? [...holes].sort(
+                (a, b) => Number(b.hole_number) - Number(a.hole_number)
+              )[0]
+            : null;
+
         const teamAVegasPoints = holes.reduce(
           (sum, hole) =>
             sum + Number(hole.team_a_vegas_points ?? 0),
@@ -830,6 +837,40 @@ const winLinePercent = teamPointsNeededToWin
   <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-danvers-muted">
     {matchDescriptor}
   </p>
+
+  {isVegas && latestHole ? (
+    <div className="mt-2 border-t border-danvers-border pt-2">
+      <p className="text-[9px] font-black uppercase tracking-[0.1em] text-danvers-muted">
+        H{latestHole.hole_number} · {latestHole.team_a_score}-
+        {latestHole.team_b_score}
+        {latestHole.team_a_flipped || latestHole.team_b_flipped
+          ? " · Flip"
+          : ""}
+        {Number(latestHole.vegas_multiplier ?? 1) > 1
+          ? ` · ${Number(latestHole.vegas_multiplier)}×`
+          : ""}
+      </p>
+
+      {Number(latestHole.team_a_vegas_points ?? 0) > 0 ||
+      Number(latestHole.team_b_vegas_points ?? 0) > 0 ? (
+        <p className="mt-1 text-[9px] font-black text-danvers-gold">
+          +
+          {Math.max(
+            Number(latestHole.team_a_vegas_points ?? 0),
+            Number(latestHole.team_b_vegas_points ?? 0)
+          )}{" "}
+          {Number(latestHole.team_a_vegas_points ?? 0) >
+          Number(latestHole.team_b_vegas_points ?? 0)
+            ? match.team_a_name ?? "Team A"
+            : match.team_b_name ?? "Team B"}
+        </p>
+      ) : (
+        <p className="mt-1 text-[9px] font-black text-danvers-muted">
+          Hole tied
+        </p>
+      )}
+    </div>
+  ) : null}
 </div>
 
               <div

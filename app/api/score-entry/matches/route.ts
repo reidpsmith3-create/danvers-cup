@@ -116,6 +116,13 @@ export async function GET(request: Request) {
     const competition = competitionById.get(match.competition_id);
     const isVegas = competition?.format === "vegas";
 
+    const latestHole =
+      holes.length > 0
+        ? [...holes].sort(
+            (a, b) => Number(b.hole_number) - Number(a.hole_number)
+          )[0]
+        : null;
+
     const teamAWins = holes.filter(
       (hole) => hole.winning_side === "team_a"
     ).length;
@@ -210,6 +217,25 @@ const matchupLabel = `${shortA} vs ${shortB}`;
       matchupLabel,
       status,
       holesScored: holes.length,
+      latestVegasHole:
+        isVegas && latestHole
+          ? {
+              holeNumber: Number(latestHole.hole_number),
+              teamAScore:
+                latestHole.team_a_score == null
+                  ? null
+                  : Number(latestHole.team_a_score),
+              teamBScore:
+                latestHole.team_b_score == null
+                  ? null
+                  : Number(latestHole.team_b_score),
+              teamAPoints: Number(latestHole.team_a_vegas_points ?? 0),
+              teamBPoints: Number(latestHole.team_b_vegas_points ?? 0),
+              teamAFlipped: Boolean(latestHole.team_a_flipped),
+              teamBFlipped: Boolean(latestHole.team_b_flipped),
+              multiplier: Number(latestHole.vegas_multiplier ?? 1),
+            }
+          : null,
     };
   });
 

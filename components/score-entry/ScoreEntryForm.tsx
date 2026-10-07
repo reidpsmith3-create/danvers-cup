@@ -29,6 +29,16 @@ type MatchStatus = {
   status: string;
   isFinal: boolean;
   holesScored: number;
+  latestVegasHole: {
+    holeNumber: number;
+    teamAScore: number | null;
+    teamBScore: number | null;
+    teamAPoints: number;
+    teamBPoints: number;
+    teamAFlipped: boolean;
+    teamBFlipped: boolean;
+    multiplier: number;
+  } | null;
 };
 
 type ScoreEntryFormProps = {
@@ -335,6 +345,42 @@ export default function ScoreEntryForm({
     Thru {match.holesScored}
   </p>
 )}
+
+{match.latestVegasHole ? (
+  <div className="mt-2 border-t border-danvers-border pt-2 text-center">
+    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-danvers-muted">
+      H{match.latestVegasHole.holeNumber} ·{" "}
+      {match.latestVegasHole.teamAScore}-
+      {match.latestVegasHole.teamBScore}
+      {match.latestVegasHole.teamAFlipped ||
+      match.latestVegasHole.teamBFlipped
+        ? " · Flip"
+        : ""}
+      {match.latestVegasHole.multiplier > 1
+        ? ` · ${match.latestVegasHole.multiplier}×`
+        : ""}
+    </p>
+
+    {match.latestVegasHole.teamAPoints > 0 ||
+    match.latestVegasHole.teamBPoints > 0 ? (
+      <p className="mt-1 text-[10px] font-black text-danvers-gold">
+        +
+        {Math.max(
+          match.latestVegasHole.teamAPoints,
+          match.latestVegasHole.teamBPoints
+        )}{" "}
+        {match.latestVegasHole.teamAPoints >
+        match.latestVegasHole.teamBPoints
+          ? match.sideAPlayers
+          : match.sideBPlayers}
+      </p>
+    ) : (
+      <p className="mt-1 text-[10px] font-black text-danvers-muted">
+        Hole tied
+      </p>
+    )}
+  </div>
+) : null}
           </div>
         ))}
       </div>
