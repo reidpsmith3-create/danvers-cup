@@ -10,6 +10,20 @@ export async function POST(request: Request) {
   const teamAName = String(body.teamAName ?? "Team A");
   const teamBName = String(body.teamBName ?? "Team B");
 
+  const winPointsOverride =
+    body.winPointsOverride === null ||
+    body.winPointsOverride === undefined ||
+    body.winPointsOverride === ""
+      ? null
+      : Number(body.winPointsOverride);
+
+  const tiePointsOverride =
+    body.tiePointsOverride === null ||
+    body.tiePointsOverride === undefined ||
+    body.tiePointsOverride === ""
+      ? null
+      : Number(body.tiePointsOverride);
+
   const teamAPlayerIds = Array.isArray(body.teamAPlayerIds)
     ? body.teamAPlayerIds.map((id: unknown) => String(id))
     : [];
@@ -17,6 +31,18 @@ export async function POST(request: Request) {
   const teamBPlayerIds = Array.isArray(body.teamBPlayerIds)
     ? body.teamBPlayerIds.map((id: unknown) => String(id))
     : [];
+
+  if (
+    (winPointsOverride !== null &&
+      (!Number.isFinite(winPointsOverride) || winPointsOverride < 0)) ||
+    (tiePointsOverride !== null &&
+      (!Number.isFinite(tiePointsOverride) || tiePointsOverride < 0))
+  ) {
+    return NextResponse.json(
+      { error: "Match point overrides must be valid non-negative numbers." },
+      { status: 400 }
+    );
+  }
 
   if (!competitionId) {
     return NextResponse.json(
@@ -46,9 +72,32 @@ export async function POST(request: Request) {
     );
   }
 
-const duplicatePlayer = teamAPlayerIds.find((playerId: string) =>
-  teamBPlayerIds.includes(playerId)
-);
+  const { data: competition, error: competitionError } = await supabase
+    .from("competitions")
+    .select("id, format")
+    .eq("id", competitionId)
+    .single();
+
+  if (competitionError || !competition) {
+    return NextResponse.json(
+      { error: "Competition not found." },
+      { status: 400 }
+    );
+  }
+
+  if (
+    competition.format === "vegas" &&
+    (teamAPlayerIds.length !== 2 || teamBPlayerIds.length !== 2)
+  ) {
+    return NextResponse.json(
+      { error: "Vegas requires exactly 2 players on each side." },
+      { status: 400 }
+    );
+  }
+
+  const duplicatePlayer = teamAPlayerIds.find((playerId: string) =>
+    teamBPlayerIds.includes(playerId)
+  );
 
   if (duplicatePlayer) {
     return NextResponse.json(
@@ -65,6 +114,8 @@ const duplicatePlayer = teamAPlayerIds.find((playerId: string) =>
     team_b_name: teamBName,
     team_a_player_ids: teamAPlayerIds,
     team_b_player_ids: teamBPlayerIds,
+    win_points_override: winPointsOverride,
+    tie_points_override: tiePointsOverride,
   });
 
   if (error) {

@@ -113,9 +113,30 @@ export async function GET(request: Request) {
   const matchCards = relevantMatches.map((match) => {
     const holes = (matchHoles ?? []).filter((hole) => hole.match_id === match.id);
 
-    const teamAWins = holes.filter((hole) => hole.winning_side === "team_a").length;
-    const teamBWins = holes.filter((hole) => hole.winning_side === "team_b").length;
+    const competition = competitionById.get(match.competition_id);
+    const isVegas = competition?.format === "vegas";
+
+    const teamAWins = holes.filter(
+      (hole) => hole.winning_side === "team_a"
+    ).length;
+
+    const teamBWins = holes.filter(
+      (hole) => hole.winning_side === "team_b"
+    ).length;
+
     const margin = Math.abs(teamAWins - teamBWins);
+
+    const teamAVegasPoints = holes.reduce(
+      (total, hole) =>
+        total + Number(hole.team_a_vegas_points ?? 0),
+      0
+    );
+
+    const teamBVegasPoints = holes.reduce(
+      (total, hole) =>
+        total + Number(hole.team_b_vegas_points ?? 0),
+      0
+    );
 
     const sideAPlayers =
       playerNames(match.team_a_player_ids ?? [], players ?? []) ??
@@ -133,8 +154,17 @@ export async function GET(request: Request) {
     const sideBColor =
       teamById.get(match.team_b_id)?.color ?? "#1f7a4d";
 
-    const leadingSide =
-      margin === 0 ? null : teamAWins > teamBWins ? "team_a" : "team_b";
+    const leadingSide = isVegas
+      ? teamAVegasPoints === teamBVegasPoints
+        ? null
+        : teamAVegasPoints > teamBVegasPoints
+          ? "team_a"
+          : "team_b"
+      : margin === 0
+        ? null
+        : teamAWins > teamBWins
+          ? "team_a"
+          : "team_b";
 
     const leader =
       leadingSide === "team_a"
@@ -150,16 +180,15 @@ export async function GET(request: Request) {
           ? sideBColor
           : "#c39b45";
 
-const status =
-  match.final_result && match.winning_side
-    ? match.winning_side === "halved"
-      ? "Match Halved"
-      : `${leader} wins ${match.final_result}`
-    : holes.length === 0 || margin === 0
-      ? "All Square"
-      : `${leader} ${margin} Up`;
-
-    const competition = competitionById.get(match.competition_id);
+    const status = isVegas
+      ? `Vegas ${teamAVegasPoints}-${teamBVegasPoints}`
+      : match.final_result && match.winning_side
+        ? match.winning_side === "halved"
+          ? "Match Halved"
+          : `${leader} wins ${match.final_result}`
+        : holes.length === 0 || margin === 0
+          ? "All Square"
+          : `${leader} ${margin} Up`;
 const shortA =
   sideAPlayers.split("/")[0]?.trim() ?? sideAPlayers;
 

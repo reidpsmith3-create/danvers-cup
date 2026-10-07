@@ -21,7 +21,7 @@ export default async function AdminMatchesPage() {
     .from("competitions")
     .select("*, rounds(round_number, name)")
     .eq("season_id", season?.id)
-    .in("format", ["match", "best_ball"])
+    .in("format", ["match", "best_ball", "vegas"])
     .order("created_at", { ascending: true });
   const { data: teams } = await supabase
     .from("teams")
@@ -101,9 +101,24 @@ export default async function AdminMatchesPage() {
   Round {competition?.rounds?.round_number ?? "—"} ·{" "}
   {competition?.name ?? "Competition"}
 </p>
-<p className="mt-1 text-xs uppercase tracking-[0.2em] text-danvers-brass">
-  {competition?.format ?? "match"}
-</p>
+<div className="mt-1 flex flex-wrap items-center gap-2">
+  <p className="text-xs uppercase tracking-[0.2em] text-danvers-brass">
+    {competition?.format ?? "match"}
+  </p>
+
+  {match.win_points_override !== null ||
+  match.tie_points_override !== null ? (
+    <span className="rounded-full border border-danvers-gold/40 bg-danvers-gold/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-danvers-gold">
+      Custom Points
+      {match.win_points_override !== null
+        ? ` · Win ${match.win_points_override}`
+        : ""}
+      {match.tie_points_override !== null
+        ? ` · Tie ${match.tie_points_override}`
+        : ""}
+    </span>
+  ) : null}
+</div>
                     <div className="mt-3 flex items-center gap-3">
  <div className="mb-3 inline-flex rounded-full bg-danvers-green/20 px-3 py-1 text-xs font-black uppercase tracking-[0.15em] text-danvers-green">
   Ready For Scoring

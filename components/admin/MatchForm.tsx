@@ -7,6 +7,12 @@ type Competition = {
   id: string;
   name: string;
   format?: string;
+  settings?: {
+    winPoints?: number;
+    tiePoints?: number;
+    matchWinPoints?: number;
+    matchTiePoints?: number;
+  } | null;
 };
 
 type Team = {
@@ -44,12 +50,28 @@ export default function MatchForm({
   const [teamBPlayerIds, setTeamBPlayerIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [winPointsOverride, setWinPointsOverride] = useState("");
+  const [tiePointsOverride, setTiePointsOverride] = useState("");
 
   const teamAName = teams.find((team) => team.id === teamAId)?.name ?? "Team A";
   const teamBName = teams.find((team) => team.id === teamBId)?.name ?? "Team B";
 
   const selectedCompetition = competitions.find(
     (competition) => competition.id === competitionId
+  );
+
+  const competitionSettings = selectedCompetition?.settings ?? {};
+
+  const defaultWinPoints = Number(
+    competitionSettings.matchWinPoints ??
+      competitionSettings.winPoints ??
+      1
+  );
+
+  const defaultTiePoints = Number(
+    competitionSettings.matchTiePoints ??
+      competitionSettings.tiePoints ??
+      0.5
   );
 
   const playersById = useMemo(() => {
@@ -90,6 +112,12 @@ export default function MatchForm({
     selectedCompetition?.format === "match" &&
     (teamAPlayerIds.length > 1 || teamBPlayerIds.length > 1);
 
+  const isVegas = selectedCompetition?.format === "vegas";
+
+  const vegasRosterInvalid =
+    isVegas &&
+    (teamAPlayerIds.length !== 2 || teamBPlayerIds.length !== 2);
+
   function togglePlayer(side: "A" | "B", playerId: string) {
     if (side === "A") {
       setTeamAPlayerIds((current) =>
@@ -128,6 +156,12 @@ export default function MatchForm({
       return;
     }
 
+    if (isVegas && vegasRosterInvalid) {
+      setMessage("Vegas requires exactly 2 players on each side.");
+      setIsSaving(false);
+      return;
+    }
+
     const response = await fetch("/api/admin/matches", {
       method: "POST",
       headers: {
@@ -141,6 +175,14 @@ export default function MatchForm({
         teamBName,
         teamAPlayerIds,
         teamBPlayerIds,
+        winPointsOverride:
+          winPointsOverride.trim() === ""
+            ? null
+            : Number(winPointsOverride),
+        tiePointsOverride:
+          tiePointsOverride.trim() === ""
+            ? null
+            : Number(tiePointsOverride),
       }),
     });
 
@@ -154,6 +196,8 @@ export default function MatchForm({
 
     setTeamAPlayerIds([]);
     setTeamBPlayerIds([]);
+    setWinPointsOverride("");
+    setTiePointsOverride("");
     setMessage("Match saved.");
     setIsSaving(false);
     router.refresh();
@@ -286,6 +330,54 @@ export default function MatchForm({
                 </p>
               )}
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-danvers-border bg-black/20 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-black">Match Point Value</h3>
+              <p className="mt-1 text-sm leading-6 text-danvers-muted">
+                Leave these blank to use the competition defaults. Enter a value
+                only when this specific match should be worth something different.
+              </p>
+            </div>
+
+            <div className="rounded-full border border-danvers-border bg-black/20 px-3 py-1 text-xs font-black text-danvers-muted">
+              Default: {defaultWinPoints} win · {defaultTiePoints} tie
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2">
+              <span className="text-sm font-bold text-danvers-muted">
+                Win Points Override
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={winPointsOverride}
+                onChange={(event) => setWinPointsOverride(event.target.value)}
+                placeholder={`Default: ${defaultWinPoints}`}
+                className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-sm font-bold text-danvers-muted">
+                Tie Points Override
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={tiePointsOverride}
+                onChange={(event) => setTiePointsOverride(event.target.value)}
+                placeholder={`Default: ${defaultTiePoints}`}
+                className="rounded-2xl border border-danvers-border bg-black/30 p-4 text-danvers-text"
+              />
+            </label>
           </div>
         </div>
 

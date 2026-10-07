@@ -109,7 +109,7 @@ export default async function MatchPage({ params }: MatchPageProps) {
   const { data: match } = await supabase
     .from("matches")
     .select(
-      "*, competitions(id, name, season_id, settings, rounds(course_id)), team_a:teams!matches_team_a_id_fkey(id, name, color, logo_url), team_b:teams!matches_team_b_id_fkey(id, name, color, logo_url)"
+      "*, competitions(id, name, format, season_id, settings, rounds(course_id)), team_a:teams!matches_team_a_id_fkey(id, name, color, logo_url), team_b:teams!matches_team_b_id_fkey(id, name, color, logo_url)"
     )
     .eq("id", params.id)
     .single();
@@ -211,32 +211,78 @@ export default async function MatchPage({ params }: MatchPageProps) {
   );
 
   const matchScore = getMatchScore(holeRows);
+  const isVegas = match.competitions?.format === "vegas";
 
-  const sideAIsLeading = matchScore.leadingSide === "team_a";
-  const sideBIsLeading = matchScore.leadingSide === "team_b";
+  const teamAVegasPoints = holeRows.reduce(
+    (total, hole) =>
+      total + Number(hole.team_a_vegas_points ?? 0),
+    0
+  );
+
+  const teamBVegasPoints = holeRows.reduce(
+    (total, hole) =>
+      total + Number(hole.team_b_vegas_points ?? 0),
+    0
+  );
+
+  const vegasLeadingSide =
+    teamAVegasPoints === teamBVegasPoints
+      ? null
+      : teamAVegasPoints > teamBVegasPoints
+        ? "team_a"
+        : "team_b";
+
+  const leadingSide = isVegas
+    ? vegasLeadingSide
+    : matchScore.leadingSide;
+
+  const sideAIsLeading = leadingSide === "team_a";
+  const sideBIsLeading = leadingSide === "team_b";
 
   const leaderName =
-    matchScore.leadingSide === "team_a"
+    leadingSide === "team_a"
       ? sideAPlayers
-      : matchScore.leadingSide === "team_b"
+      : leadingSide === "team_b"
         ? sideBPlayers
         : null;
 
+  const leaderTeamName =
+    leadingSide === "team_a"
+      ? sideATeamName
+      : leadingSide === "team_b"
+        ? sideBTeamName
+        : null;
+
   const leaderColor =
-    matchScore.leadingSide === "team_a"
+    leadingSide === "team_a"
       ? sideAColor
-      : matchScore.leadingSide === "team_b"
+      : leadingSide === "team_b"
         ? sideBColor
         : "#c39b45";
 
-  const heroStatus =
-  match.final_result && match.winning_side
-    ? match.winning_side === "halved"
-      ? "Match Halved"
-      : `${leaderName} wins ${match.final_result}`
-    : matchScore.margin === 0
-      ? "All Square"
-      : `${leaderName} ${matchScore.margin} Up`;
+  const vegasMargin = Math.abs(
+    teamAVegasPoints - teamBVegasPoints
+  );
+
+  const heroStatus = isVegas
+    ? match.final_result && match.winning_side
+      ? match.winning_side === "halved"
+        ? "Vegas Match Halved"
+        : `${leaderTeamName} wins the Vegas match`
+      : vegasMargin === 0
+        ? "Vegas Points Tied"
+        : `${leaderTeamName} leads by ${vegasMargin}`
+    : match.final_result && match.winning_side
+      ? match.winning_side === "halved"
+        ? "Match Halved"
+        : `${leaderName} wins ${match.final_result}`
+      : matchScore.margin === 0
+        ? "All Square"
+        : `${leaderName} ${matchScore.margin} Up`;
+
+  const heroScore = isVegas
+    ? `${teamAVegasPoints} – ${teamBVegasPoints}`
+    : match.final_result ?? matchScore.shortLabel;
 
   return (
     <main className="min-h-screen px-4 pb-24 pt-5 text-danvers-text">
@@ -260,7 +306,7 @@ export default async function MatchPage({ params }: MatchPageProps) {
                 className="mt-2 text-5xl font-black leading-none"
                 style={{ color: leaderColor }}
               >
-                {match.final_result ?? matchScore.shortLabel}
+                {heroScore}
               </h1>
 
               <p className="mt-2 text-xl font-black">{heroStatus}</p>
@@ -285,6 +331,12 @@ export default async function MatchPage({ params }: MatchPageProps) {
                 <h2 className="mt-2 text-lg font-black leading-tight">
                   {sideAPlayers}
                 </h2>
+
+                {isVegas ? (
+                  <p className="mt-3 text-2xl font-black">
+                    {teamAVegasPoints} pts
+                  </p>
+                ) : null}
               </div>
 
               <div className="text-center text-xs font-black uppercase tracking-[0.2em] text-danvers-muted">
@@ -305,6 +357,12 @@ export default async function MatchPage({ params }: MatchPageProps) {
                 <h2 className="mt-2 text-lg font-black leading-tight">
                   {sideBPlayers}
                 </h2>
+
+                {isVegas ? (
+                  <p className="mt-3 text-2xl font-black">
+                    {teamBVegasPoints} pts
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -330,30 +388,72 @@ export default async function MatchPage({ params }: MatchPageProps) {
               return (
                 <div
                   key={hole.holeNumber}
-                  className="flex min-w-14 flex-col items-center rounded-2xl border border-danvers-border bg-black/20 p-3"
+                  className={`flex flex-col items-center rounded-2xl border border-danvers-border bg-black/20 p-3 ${
+                    isVegas ? "min-w-[130px]" : "min-w-14"
+                  }`}
                 >
                   <p className="text-[10px] font-black uppercase tracking-[0.12em] text-danvers-muted">
                     Hole
                   </p>
                   <p className="text-xl font-black">{hole.holeNumber}</p>
 
-                  <div
-                    className="mt-2 h-3 w-3 rounded-full border border-danvers-border"
-                    style={{
-                      backgroundColor: color ?? "transparent",
-                      borderColor: color ?? undefined,
-                    }}
-                  />
+                  {isVegas && hole.score ? (
+                    <>
+                      <p className="mt-2 whitespace-nowrap text-sm font-black">
+                        {hole.score.team_a_score} – {hole.score.team_b_score}
+                      </p>
 
-                  <p className="mt-2 text-[10px] font-bold uppercase text-danvers-muted">
-                    {winner === "team_a"
-                      ? sideATeamName
-                      : winner === "team_b"
-                        ? sideBTeamName
-                        : winner === "halved"
-                          ? "Halved"
-                          : "Open"}
-                  </p>
+                      <p
+                        className="mt-1 whitespace-nowrap text-[10px] font-black uppercase"
+                        style={{ color: color }}
+                      >
+                        {winner === "team_a"
+                          ? `+${hole.score.team_a_vegas_points ?? 0} ${sideATeamName}`
+                          : winner === "team_b"
+                            ? `+${hole.score.team_b_vegas_points ?? 0} ${sideBTeamName}`
+                            : "Tie"}
+                      </p>
+
+                      {hole.score.team_a_flipped ||
+                      hole.score.team_b_flipped ||
+                      Number(hole.score.vegas_multiplier ?? 1) > 1 ? (
+                        <div className="mt-2 flex flex-wrap justify-center gap-1">
+                          {hole.score.team_a_flipped ||
+                          hole.score.team_b_flipped ? (
+                            <span className="rounded-full border border-danvers-gold/50 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-danvers-gold">
+                              Flip
+                            </span>
+                          ) : null}
+
+                          {Number(hole.score.vegas_multiplier ?? 1) > 1 ? (
+                            <span className="rounded-full border border-danvers-gold/50 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-danvers-gold">
+                              2×
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        className="mt-2 h-3 w-3 rounded-full border border-danvers-border"
+                        style={{
+                          backgroundColor: color ?? "transparent",
+                          borderColor: color ?? undefined,
+                        }}
+                      />
+
+                      <p className="mt-2 text-[10px] font-bold uppercase text-danvers-muted">
+                        {winner === "team_a"
+                          ? sideATeamName
+                          : winner === "team_b"
+                            ? sideBTeamName
+                            : winner === "halved"
+                              ? "Halved"
+                              : "Open"}
+                      </p>
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -366,7 +466,9 @@ export default async function MatchPage({ params }: MatchPageProps) {
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-brass">
                 Hole-by-Hole
               </p>
-              <h2 className="mt-2 text-3xl font-black">Scorecard</h2>
+              <h2 className="mt-2 text-3xl font-black">
+                {isVegas ? "Vegas Scorecard" : "Scorecard"}
+              </h2>
             </div>
 
             <p className="text-sm font-bold text-danvers-muted">
@@ -416,11 +518,29 @@ export default async function MatchPage({ params }: MatchPageProps) {
                           : "text-danvers-muted"
                       }`}
                     >
-                      <ScoreBadge score={hole.score?.team_a_score} par={hole.par} />
+                      {isVegas ? (
+                        hole.score ? (
+                          <div>
+                            <div>{hole.score.team_a_score}</div>
+                            <div className="mt-1 text-[10px] uppercase tracking-[0.08em]">
+                              +{Number(hole.score.team_a_vegas_points ?? 0)}
+                            </div>
+                          </div>
+                        ) : (
+                          "—"
+                        )
+                      ) : (
+                        <ScoreBadge
+                          score={hole.score?.team_a_score}
+                          par={hole.par}
+                        />
+                      )}
                     </td>
                   ))}
                   <td className="p-3 text-center font-black">
-                    {sideATotal || "—"}
+                    {isVegas
+                      ? teamAVegasPoints
+                      : sideATotal || "—"}
                   </td>
                 </tr>
 
@@ -437,11 +557,29 @@ export default async function MatchPage({ params }: MatchPageProps) {
                           : "text-danvers-muted"
                       }`}
                     >
-                      <ScoreBadge score={hole.score?.team_b_score} par={hole.par} />
+                      {isVegas ? (
+                        hole.score ? (
+                          <div>
+                            <div>{hole.score.team_b_score}</div>
+                            <div className="mt-1 text-[10px] uppercase tracking-[0.08em]">
+                              +{Number(hole.score.team_b_vegas_points ?? 0)}
+                            </div>
+                          </div>
+                        ) : (
+                          "—"
+                        )
+                      ) : (
+                        <ScoreBadge
+                          score={hole.score?.team_b_score}
+                          par={hole.par}
+                        />
+                      )}
                     </td>
                   ))}
                   <td className="p-3 text-center font-black">
-                    {sideBTotal || "—"}
+                    {isVegas
+                      ? teamBVegasPoints
+                      : sideBTotal || "—"}
                   </td>
                 </tr>
               </tbody>

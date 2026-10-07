@@ -1,32 +1,9 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-
-function getMatchOutcome(holes: any[]) {
-  const teamAWins = holes.filter((hole) => hole.winning_side === "team_a").length;
-  const teamBWins = holes.filter((hole) => hole.winning_side === "team_b").length;
-
-  if (teamAWins > teamBWins) {
-    return {
-      teamAPoints: 1,
-      teamBPoints: 0,
-      label: `Team A wins ${teamAWins}-${teamBWins}`,
-    };
-  }
-
-  if (teamBWins > teamAWins) {
-    return {
-      teamAPoints: 0,
-      teamBPoints: 1,
-      label: `Team B wins ${teamBWins}-${teamAWins}`,
-    };
-  }
-
-  return {
-    teamAPoints: 0.5,
-    teamBPoints: 0.5,
-    label: "Match halved",
-  };
-}
+import {
+  resolveMatchOutcome,
+  resolveMatchPointValues,
+} from "@/lib/scoring/matchResults";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -59,7 +36,10 @@ export async function POST(request: Request) {
     .order("created_at", { ascending: true });
 
   if (matchesError) {
-    return NextResponse.json({ error: matchesError.message }, { status: 500 });
+    return NextResponse.json(
+      { error: matchesError.message },
+      { status: 500 }
+    );
   }
 
   const matchRows = (matches as any[]) ?? [];
@@ -80,56 +60,116 @@ export async function POST(request: Request) {
     .order("hole_number", { ascending: true });
 
   if (holesError) {
-    return NextResponse.json({ error: holesError.message }, { status: 500 });
+    return NextResponse.json(
+      { error: holesError.message },
+      { status: 500 }
+    );
   }
 
   const holeRows = (holes as any[]) ?? [];
-
-  await supabase
-    .from("competition_results")
-    .delete()
-    .eq("competition_id", competitionId);
+  const settings = competition.settings ?? {};
 
   const teamPoints = new Map<string, number>();
   const playerPoints = new Map<string, number>();
-  const resultRows: any[] = [];
+  const teamLabels = new Map<string, string[]>();
+  const playerLabels = new Map<string, string[]>();
 
-  matchRows.forEach((match) => {
-    const holesForMatch = holeRows.filter((hole) => hole.match_id === match.id);
-    const outcome = getMatchOutcome(holesForMatch);
+  function addPoints(
+    map: Map<string, number>,
+    labels: Map<string, string[]>,
+    id: string | null | undefined,
+    points: number,
+    label: string
+  ) {
+    if (!id) return;
+
+    map.set(id, (map.get(id) ?? 0) + points);
+    labels.set(id, [...(labels.get(id) ?? []), label]);
+  }
+
+  for (const match of matchRows) {
+    const holesForMatch = holeRows.filter(
+      (hole) => hole.match_id === match.id
+    );
+
+    if (!holesForMatch.length) continue;
+
+    const outcome = resolveMatchOutcome({
+      match,
+      holes: holesForMatch,
+      format: competition.format,
+      settings,
+    });
+
+    if (outcome.winner === "pending") {
+      continue;
+    }
+
+    const { winPoints, tiePoints } = resolveMatchPointValues(
+      match,
+      settings
+    );
+
+    const teamAPoints =
+      outcome.winner === "team_a"
+        ? winPoints
+        : outcome.winner === "tie"
+          ? tiePoints
+          : 0;
+
+    const teamBPoints =
+      outcome.winner === "team_b"
+        ? winPoints
+        : outcome.winner === "tie"
+          ? tiePoints
+          : 0;
 
     if (competition.counts_for_team_points) {
-      if (match.team_a_id) {
-        teamPoints.set(
-          match.team_a_id,
-          (teamPoints.get(match.team_a_id) ?? 0) + outcome.teamAPoints
-        );
-      }
+      addPoints(
+        teamPoints,
+        teamLabels,
+        match.team_a_id,
+        teamAPoints,
+        outcome.label
+      );
 
-      if (match.team_b_id) {
-        teamPoints.set(
-          match.team_b_id,
-          (teamPoints.get(match.team_b_id) ?? 0) + outcome.teamBPoints
-        );
-      }
+      addPoints(
+        teamPoints,
+        teamLabels,
+        match.team_b_id,
+        teamBPoints,
+        outcome.label
+      );
     }
 
     if (competition.counts_for_individual_points) {
-      (match.team_a_player_ids ?? []).forEach((playerId: string) => {
-        playerPoints.set(
-          playerId,
-          (playerPoints.get(playerId) ?? 0) + outcome.teamAPoints
-        );
-      });
+      (match.team_a_player_ids ?? []).forEach(
+        (playerId: string) => {
+          addPoints(
+            playerPoints,
+            playerLabels,
+            playerId,
+            teamAPoints,
+            outcome.label
+          );
+        }
+      );
 
-      (match.team_b_player_ids ?? []).forEach((playerId: string) => {
-        playerPoints.set(
-          playerId,
-          (playerPoints.get(playerId) ?? 0) + outcome.teamBPoints
-        );
-      });
+      (match.team_b_player_ids ?? []).forEach(
+        (playerId: string) => {
+          addPoints(
+            playerPoints,
+            playerLabels,
+            playerId,
+            teamBPoints,
+            outcome.label
+          );
+        }
+      );
     }
-  });
+  }
+
+  const resultRows: any[] = [];
 
   teamPoints.forEach((points, teamId) => {
     resultRows.push({
@@ -137,7 +177,9 @@ export async function POST(request: Request) {
       team_id: teamId,
       player_id: null,
       points,
-      result_label: "Auto-finalized from match results",
+      result_label:
+        teamLabels.get(teamId)?.join(" · ") ??
+        "Auto-finalized from match results",
       is_official: true,
     });
   });
@@ -148,17 +190,29 @@ export async function POST(request: Request) {
       team_id: null,
       player_id: playerId,
       points,
-      result_label: "Auto-finalized from match results",
+      result_label:
+        playerLabels.get(playerId)?.join(" · ") ??
+        "Auto-finalized from match results",
       is_official: true,
     });
   });
 
-  const { error: insertError } = await supabase
+  await supabase
     .from("competition_results")
-    .insert(resultRows);
+    .delete()
+    .eq("competition_id", competitionId);
 
-  if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+  if (resultRows.length) {
+    const { error: insertError } = await supabase
+      .from("competition_results")
+      .insert(resultRows);
+
+    if (insertError) {
+      return NextResponse.json(
+        { error: insertError.message },
+        { status: 500 }
+      );
+    }
   }
 
   return NextResponse.json({

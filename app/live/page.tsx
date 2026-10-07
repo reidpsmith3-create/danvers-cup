@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getCurrentRound } from "@/lib/rounds/getCurrentRound";
 import { getCurrentSeason } from "@/lib/currentSeason";
+import { resolveMatchPointValues } from "@/lib/scoring/matchResults";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -349,8 +350,22 @@ const individualLeaderMoment =
 
 const projectedLivePointMap = new Map<string, number>();
 
+function addProjectedPoints(
+  teamId: string | null | undefined,
+  points: number
+) {
+  if (!teamId) return;
+
+  projectedLivePointMap.set(
+    teamId,
+    (projectedLivePointMap.get(teamId) ?? 0) + points
+  );
+}
+
 matchRows.forEach((match) => {
-  const holes = matchHoleRows.filter((hole) => hole.match_id === match.id);
+  const holes = matchHoleRows.filter(
+    (hole) => hole.match_id === match.id
+  );
 
   if (holes.length === 0) return;
 
@@ -359,10 +374,54 @@ matchRows.forEach((match) => {
   );
 
   const settings = (competition as any)?.settings ?? {};
+  const isVegas = competition?.format === "vegas";
 
-  const winPoints = Number(settings.matchWinPoints ?? settings.winPoints ?? 1);
-  const tiePoints = Number(settings.matchTiePoints ?? settings.tiePoints ?? 0.5);
+  const { winPoints, tiePoints } = resolveMatchPointValues(
+    match,
+    settings
+  );
 
+  // Finalized matches use the saved result.
+  if (match.final_result && match.winning_side) {
+    if (match.winning_side === "team_a") {
+      addProjectedPoints(match.team_a_id, winPoints);
+    } else if (match.winning_side === "team_b") {
+      addProjectedPoints(match.team_b_id, winPoints);
+    } else if (match.winning_side === "halved") {
+      addProjectedPoints(match.team_a_id, tiePoints);
+      addProjectedPoints(match.team_b_id, tiePoints);
+    }
+
+    return;
+  }
+
+  // Vegas projects the Cup point from cumulative Vegas points.
+  if (isVegas) {
+    const teamAVegasPoints = holes.reduce(
+      (sum, hole) =>
+        sum + Number(hole.team_a_vegas_points ?? 0),
+      0
+    );
+
+    const teamBVegasPoints = holes.reduce(
+      (sum, hole) =>
+        sum + Number(hole.team_b_vegas_points ?? 0),
+      0
+    );
+
+    if (teamAVegasPoints > teamBVegasPoints) {
+      addProjectedPoints(match.team_a_id, winPoints);
+    } else if (teamBVegasPoints > teamAVegasPoints) {
+      addProjectedPoints(match.team_b_id, winPoints);
+    } else {
+      addProjectedPoints(match.team_a_id, tiePoints);
+      addProjectedPoints(match.team_b_id, tiePoints);
+    }
+
+    return;
+  }
+
+  // Standard match play / best ball projects from holes won.
   const teamAWins = holes.filter(
     (hole) => hole.winning_side === "team_a"
   ).length;
@@ -370,67 +429,14 @@ matchRows.forEach((match) => {
   const teamBWins = holes.filter(
     (hole) => hole.winning_side === "team_b"
   ).length;
-if (match.final_result && match.winning_side) {
-  if (match.winning_side === "team_a" && match.team_a_id) {
-    projectedLivePointMap.set(
-      match.team_a_id,
-      (projectedLivePointMap.get(match.team_a_id) ?? 0) + winPoints
-    );
-  }
 
-  if (match.winning_side === "team_b" && match.team_b_id) {
-    projectedLivePointMap.set(
-      match.team_b_id,
-      (projectedLivePointMap.get(match.team_b_id) ?? 0) + winPoints
-    );
-  }
-
-  if (match.winning_side === "halved") {
-    if (match.team_a_id) {
-      projectedLivePointMap.set(
-        match.team_a_id,
-        (projectedLivePointMap.get(match.team_a_id) ?? 0) + tiePoints
-      );
-    }
-
-    if (match.team_b_id) {
-      projectedLivePointMap.set(
-        match.team_b_id,
-        (projectedLivePointMap.get(match.team_b_id) ?? 0) + tiePoints
-      );
-    }
-  }
-
-  return;
-}
-  if (teamAWins > teamBWins && match.team_a_id) {
-    projectedLivePointMap.set(
-      match.team_a_id,
-      (projectedLivePointMap.get(match.team_a_id) ?? 0) + winPoints
-    );
-  }
-
-  if (teamBWins > teamAWins && match.team_b_id) {
-    projectedLivePointMap.set(
-      match.team_b_id,
-      (projectedLivePointMap.get(match.team_b_id) ?? 0) + winPoints
-    );
-  }
-
-  if (teamAWins === teamBWins) {
-    if (match.team_a_id) {
-      projectedLivePointMap.set(
-        match.team_a_id,
-        (projectedLivePointMap.get(match.team_a_id) ?? 0) + tiePoints
-      );
-    }
-
-    if (match.team_b_id) {
-      projectedLivePointMap.set(
-        match.team_b_id,
-        (projectedLivePointMap.get(match.team_b_id) ?? 0) + tiePoints
-      );
-    }
+  if (teamAWins > teamBWins) {
+    addProjectedPoints(match.team_a_id, winPoints);
+  } else if (teamBWins > teamAWins) {
+    addProjectedPoints(match.team_b_id, winPoints);
+  } else {
+    addProjectedPoints(match.team_a_id, tiePoints);
+    addProjectedPoints(match.team_b_id, tiePoints);
   }
 });
 
@@ -483,29 +489,88 @@ const winLinePercent = teamPointsNeededToWin
     )
     .slice(0, 5);
     const recentMatchMoments = matchHoleRows
-  .filter((hole) => hole.winning_side === "team_a" || hole.winning_side === "team_b")
-  .sort((a, b) => Number(b.hole_number) - Number(a.hole_number))
-  .slice(0, 3)
-  .map((hole) => {
-    const match = matchRows.find((row) => row.id === hole.match_id);
+    .filter(
+      (hole) =>
+        hole.winning_side === "team_a" ||
+        hole.winning_side === "team_b"
+    )
+    .sort(
+      (a, b) =>
+        Number(b.hole_number) - Number(a.hole_number)
+    )
+    .slice(0, 3)
+    .map((hole) => {
+      const match = matchRows.find(
+        (row) => row.id === hole.match_id
+      );
 
-const leaderPlayerIds =
-  hole.winning_side === "team_a"
-    ? match?.team_a_player_ids ?? []
-    : match?.team_b_player_ids ?? [];
+      const competition = competitions?.find(
+        (item) => item.id === match?.competition_id
+      );
 
-const leader =
-  playerNames(leaderPlayerIds, playerRows) ??
-  (hole.winning_side === "team_a"
-    ? match?.team_a_name ?? "Team A"
-    : match?.team_b_name ?? "Team B");
+      const isVegas = competition?.format === "vegas";
 
-    return {
-      id: `${hole.match_id}-${hole.hole_number}`,
-      text: `${leader} wins Hole ${hole.hole_number}`,
-      subtext: `Match swing · Hole ${hole.hole_number}`,
-    };
-  });
+      const leaderPlayerIds =
+        hole.winning_side === "team_a"
+          ? match?.team_a_player_ids ?? []
+          : match?.team_b_player_ids ?? [];
+
+      const leader =
+        playerNames(leaderPlayerIds, playerRows) ??
+        (hole.winning_side === "team_a"
+          ? match?.team_a_name ?? "Team A"
+          : match?.team_b_name ?? "Team B");
+
+      if (isVegas) {
+        const vegasPointsWon =
+          hole.winning_side === "team_a"
+            ? Number(hole.team_a_vegas_points ?? 0)
+            : Number(hole.team_b_vegas_points ?? 0);
+
+        const teamAScore =
+          hole.team_a_score === null ||
+          hole.team_a_score === undefined
+            ? "—"
+            : String(hole.team_a_score);
+
+        const teamBScore =
+          hole.team_b_score === null ||
+          hole.team_b_score === undefined
+            ? "—"
+            : String(hole.team_b_score);
+
+        const details = [
+          `Vegas ${teamAScore}-${teamBScore}`,
+        ];
+
+        if (
+          hole.team_a_flipped ||
+          hole.team_b_flipped
+        ) {
+          details.push("Flip");
+        }
+
+        const multiplier = Number(
+          hole.vegas_multiplier ?? 1
+        );
+
+        if (multiplier > 1) {
+          details.push(`${multiplier}×`);
+        }
+
+        return {
+          id: `${hole.match_id}-${hole.hole_number}`,
+          text: `${leader} earns ${vegasPointsWon} Vegas pts on Hole ${hole.hole_number}`,
+          subtext: details.join(" · "),
+        };
+      }
+
+      return {
+        id: `${hole.match_id}-${hole.hole_number}`,
+        text: `${leader} wins Hole ${hole.hole_number}`,
+        subtext: `Match swing · Hole ${hole.hole_number}`,
+      };
+    });
 
   const expectedScores = playerRows.length * 18;
   const progressPercent =
@@ -630,6 +695,8 @@ const leader =
           (item) => item.id === match.competition_id
         );
 
+        const isVegas = competition?.format === "vegas";
+
         const teamAWins = holes.filter(
           (hole) => hole.winning_side === "team_a"
         ).length;
@@ -638,24 +705,59 @@ const leader =
           (hole) => hole.winning_side === "team_b"
         ).length;
 
-const margin = Math.abs(teamAWins - teamBWins);
-const isFinal = Boolean(match.final_result && match.winning_side);
+        const teamAVegasPoints = holes.reduce(
+          (sum, hole) =>
+            sum + Number(hole.team_a_vegas_points ?? 0),
+          0
+        );
 
-const status = isFinal
-  ? match.winning_side === "halved"
-    ? "AS"
-    : match.final_result
-  : holes.length === 0 || margin === 0
-    ? "AS"
-    : `${margin} UP`;
+        const teamBVegasPoints = holes.reduce(
+          (sum, hole) =>
+            sum + Number(hole.team_b_vegas_points ?? 0),
+          0
+        );
 
-const sideAIsLeading = isFinal
-  ? match.winning_side === "team_a"
-  : teamAWins > teamBWins;
+        const margin = Math.abs(teamAWins - teamBWins);
 
-const sideBIsLeading = isFinal
-  ? match.winning_side === "team_b"
-  : teamBWins > teamAWins;
+        const vegasMargin = Math.abs(
+          teamAVegasPoints - teamBVegasPoints
+        );
+
+        const isFinal = Boolean(
+          match.final_result && match.winning_side
+        );
+
+        const status = isVegas
+          ? `${teamAVegasPoints}-${teamBVegasPoints}`
+          : isFinal
+            ? match.winning_side === "halved"
+              ? "AS"
+              : match.final_result
+            : holes.length === 0 || margin === 0
+              ? "AS"
+              : `${margin} UP`;
+
+        const sideAIsLeading = isFinal
+          ? match.winning_side === "team_a"
+          : isVegas
+            ? teamAVegasPoints > teamBVegasPoints
+            : teamAWins > teamBWins;
+
+        const sideBIsLeading = isFinal
+          ? match.winning_side === "team_b"
+          : isVegas
+            ? teamBVegasPoints > teamAVegasPoints
+            : teamBWins > teamAWins;
+
+        const matchDescriptor = isVegas
+          ? isFinal
+            ? "Final Vegas"
+            : vegasMargin === 0
+              ? `Vegas · Thru ${holes.length}`
+              : `Vegas · ${vegasMargin} pt lead · Thru ${holes.length}`
+          : isFinal
+            ? "Match Complete"
+            : `Thru ${holes.length}`;
 
         const sideAPlayers =
           playerNames(match.team_a_player_ids ?? [], playerRows) ??
@@ -726,7 +828,7 @@ const sideBIsLeading = isFinal
   </p>
 
   <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-danvers-muted">
-    {isFinal ? "Match Complete" : `Thru ${holes.length}`}
+    {matchDescriptor}
   </p>
 </div>
 

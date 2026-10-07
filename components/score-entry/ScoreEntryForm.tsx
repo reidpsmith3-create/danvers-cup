@@ -27,6 +27,7 @@ type MatchStatus = {
   leaderColor: string;
   matchupLabel: string;
   status: string;
+  isFinal: boolean;
   holesScored: number;
 };
 

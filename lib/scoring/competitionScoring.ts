@@ -3,6 +3,7 @@ export type CompetitionFormat =
   | "stroke"
   | "stableford"
   | "best_ball"
+  | "vegas"
   | "wolf"
   | "skins"
   | "custom";
@@ -57,6 +58,17 @@ export const COMPETITION_SCORING_RULES: CompetitionScoringRule[] = [
     label: "Best Ball",
     description:
       "Team score for each hole is the best score among that side's players. Best ball holes are calculated first, then match results award official points.",
+    usesMatches: true,
+    usesRawScores: true,
+    supportsTeamPoints: true,
+    supportsIndividualPoints: true,
+    hasCalculator: true,
+  },
+  {
+    format: "vegas",
+    label: "2v2 Vegas",
+    description:
+      "Two-player teams combine their hole scores into a two-digit Vegas number. The lower number wins the point differential, with birdies flipping the opponents' digits and eagles flipping and doubling the differential. After 9 holes, the team with the most Vegas points wins the match.",
     usesMatches: true,
     usesRawScores: true,
     supportsTeamPoints: true,

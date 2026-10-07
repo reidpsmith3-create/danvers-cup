@@ -15,5 +15,9 @@ export function getCompetitionActions(format: string) {
     return ["Calculate Match Results"];
   }
 
+  if (format === "vegas") {
+    return ["Calculate Match Results"];
+  }
+
   return ["Manual results only"];
 }
