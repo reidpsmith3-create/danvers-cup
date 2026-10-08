@@ -51,6 +51,16 @@ export async function POST(request: Request) {
     );
   }
 
+  if (matchRows.some((match) => !match.is_official)) {
+    return NextResponse.json(
+      {
+        error:
+          "All matches must be official before competition results can be finalized.",
+      },
+      { status: 400 }
+    );
+  }
+
   const matchIds = matchRows.map((match) => match.id);
 
   const { data: holes, error: holesError } = await supabase

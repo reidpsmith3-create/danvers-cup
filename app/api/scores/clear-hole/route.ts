@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { invalidateCompetitionResults } from "@/lib/scoring/invalidateCompetitionResults";
 import {
   calculateVegasMatch,
   getVegasCompetitionHoles,
@@ -85,12 +86,29 @@ export async function POST(request: Request) {
       );
     }) ?? [];
 
+  const competitionsToInvalidate = new Set<string>();
+
   for (const match of affectedMatches) {
     const competition = competitions?.find(
       (item) => item.id === match.competition_id
     );
 
     if (!competition) continue;
+
+    const settings = (competition as any).settings ?? {};
+    const relevantHole =
+      competition.format !== "vegas" ||
+      getVegasCompetitionHoles({
+        holeCount: Number(settings.holeCount ?? 9),
+        nineType:
+          Number(settings.holeCount ?? 9) === 9
+            ? String(settings.nineType ?? "front")
+            : null,
+      }).includes(holeNumber);
+
+    if (!relevantHole) continue;
+
+    competitionsToInvalidate.add(match.competition_id);
 
     const { error: deleteHoleError } = await supabase
       .from("match_holes")
@@ -204,6 +222,17 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+  }
+
+  try {
+    for (const competitionId of competitionsToInvalidate) {
+      await invalidateCompetitionResults(competitionId);
+    }
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Result invalidation failed." },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ success: true });

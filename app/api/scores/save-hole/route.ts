@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { invalidateCompetitionResults } from "@/lib/scoring/invalidateCompetitionResults";
 import {
   calculateVegasHole,
   calculateVegasMatch,
@@ -90,6 +91,45 @@ export async function POST(request: Request) {
       { error: "Missing roundId, holeNumber, or scores." },
       { status: 400 }
     );
+  }
+
+  // Check whether any submitted score actually changes.
+  const submittedPlayerIds = [...new Set(scores.map((s) => s.playerId))];
+
+  const { data: previousScores, error: previousScoresError } =
+    await supabase
+      .from("scores")
+      .select("player_id, gross_score")
+      .eq("round_id", roundId)
+      .eq("hole_number", holeNumber)
+      .in("player_id", submittedPlayerIds);
+
+  if (previousScoresError) {
+    return NextResponse.json(
+      { error: previousScoresError.message },
+      { status: 500 }
+    );
+  }
+
+  const previousScoreMap = new Map(
+    (previousScores ?? []).map((score) => [
+      String(score.player_id),
+      Number(score.gross_score),
+    ])
+  );
+
+  const changedPlayerIds = new Set(
+    scores
+      .filter(
+        (score) =>
+          !previousScoreMap.has(score.playerId) ||
+          previousScoreMap.get(score.playerId) !== Number(score.grossScore)
+      )
+      .map((score) => score.playerId)
+  );
+
+  if (changedPlayerIds.size === 0) {
+    return NextResponse.json({ success: true });
   }
 
   /*
@@ -217,6 +257,8 @@ export async function POST(request: Request) {
     holePar = Number(courseHole.par);
   }
 
+  const competitionsToInvalidate = new Set<string>();
+
   for (const match of matches ?? []) {
     const competition = competitions?.find(
       (item) => item.id === match.competition_id
@@ -225,7 +267,34 @@ export async function POST(request: Request) {
     if (!competition) continue;
 
     const settings = (competition as any).settings ?? {};
-    const holeCount = Number(settings.holeCount ?? 18);
+
+    const matchPlayerIds = [
+      ...(match.team_a_player_ids ?? []),
+      ...(match.team_b_player_ids ?? []),
+    ];
+
+    const relevantScoreChanged = matchPlayerIds.some((playerId) =>
+      changedPlayerIds.has(playerId)
+    );
+
+    if (!relevantScoreChanged) continue;
+
+    const competitionHoleCount = Number(settings.holeCount ?? 18);
+    const relevantHole =
+      competition.format !== "vegas" ||
+      getVegasCompetitionHoles({
+        holeCount: Number(settings.holeCount ?? 9),
+        nineType:
+          Number(settings.holeCount ?? 9) === 9
+            ? String(settings.nineType ?? "front")
+            : null,
+      }).includes(holeNumber);
+
+    if (match.is_official && relevantScoreChanged && relevantHole) {
+      competitionsToInvalidate.add(match.competition_id);
+    }
+
+    const holeCount = competitionHoleCount;
 
     /*
      * VEGAS
@@ -533,6 +602,21 @@ export async function POST(request: Request) {
         final_result: result.finalResult,
       })
       .eq("id", match.id);
+  }
+
+  try {
+    for (const competitionId of competitionsToInvalidate) {
+      await invalidateCompetitionResults(competitionId);
+    }
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: error instanceof Error
+          ? error.message
+          : "Result invalidation failed.",
+      },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ success: true });
