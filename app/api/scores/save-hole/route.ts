@@ -279,16 +279,22 @@ export async function POST(request: Request) {
 
     if (!relevantScoreChanged) continue;
 
-    const competitionHoleCount = Number(settings.holeCount ?? 18);
-    const relevantHole =
-      competition.format !== "vegas" ||
-      getVegasCompetitionHoles({
-        holeCount: Number(settings.holeCount ?? 9),
-        nineType:
-          Number(settings.holeCount ?? 9) === 9
-            ? String(settings.nineType ?? "front")
-            : null,
-      }).includes(holeNumber);
+    const competitionHoleCount = Number(
+      settings.holeCount ?? (competition.format === "vegas" ? 9 : 18)
+    );
+
+    const competitionHoles = getVegasCompetitionHoles({
+      holeCount: competitionHoleCount,
+      nineType:
+        competitionHoleCount === 9
+          ? String(settings.nineType ?? "front")
+          : null,
+    });
+
+    const relevantHole = competitionHoles.includes(holeNumber);
+
+    // Never calculate match results from holes outside the competition.
+    if (!relevantHole) continue;
 
     if (match.is_official && relevantScoreChanged && relevantHole) {
       competitionsToInvalidate.add(match.competition_id);
@@ -539,10 +545,8 @@ export async function POST(request: Request) {
      *
      * Preserve the existing match-play behavior.
      */
-    if (match.is_official && match.final_result) {
-      continue;
-    }
-
+    // Recalculate even when previously official, so score corrections
+    // can update the match result and invalidate published standings.
     const teamAScore = getSideScore(
       match.team_a_player_ids ?? [],
       scores
@@ -590,7 +594,9 @@ export async function POST(request: Request) {
       .order("hole_number", { ascending: true });
 
     const result = getMatchResult(
-      (allMatchHoles as any[]) ?? [],
+      ((allMatchHoles as any[]) ?? []).filter((hole) =>
+        competitionHoles.includes(Number(hole.hole_number))
+      ),
       holeCount
     );
 

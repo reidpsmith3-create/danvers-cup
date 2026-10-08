@@ -96,17 +96,18 @@ export async function POST(request: Request) {
     if (!competition) continue;
 
     const settings = (competition as any).settings ?? {};
-    const relevantHole =
-      competition.format !== "vegas" ||
-      getVegasCompetitionHoles({
-        holeCount: Number(settings.holeCount ?? 9),
-        nineType:
-          Number(settings.holeCount ?? 9) === 9
-            ? String(settings.nineType ?? "front")
-            : null,
-      }).includes(holeNumber);
+    const holeCount = Number(
+      settings.holeCount ?? (competition.format === "vegas" ? 9 : 18)
+    );
+    const nineType =
+      holeCount === 9 ? String(settings.nineType ?? "front") : null;
 
-    if (!relevantHole) continue;
+    const competitionHoles = getVegasCompetitionHoles({
+      holeCount,
+      nineType,
+    });
+
+    if (!competitionHoles.includes(holeNumber)) continue;
 
     competitionsToInvalidate.add(match.competition_id);
 
@@ -204,21 +205,68 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Preserve existing clear-hole behavior for normal match play
-     * and best ball.
+     * Recalculate Match Play and Fourball from the remaining
+     * competition holes, including mathematically decided matches.
      */
-    const { error: resetError } = await supabase
+    const { data: remainingMatchHoles, error: remainingError } =
+      await supabase
+        .from("match_holes")
+        .select("hole_number, winning_side")
+        .eq("match_id", match.id);
+
+    if (remainingError) {
+      return NextResponse.json(
+        { error: remainingError.message },
+        { status: 500 }
+      );
+    }
+
+    const validHoles = (remainingMatchHoles ?? []).filter((hole) =>
+      competitionHoles.includes(Number(hole.hole_number))
+    );
+
+    const teamAWins = validHoles.filter(
+      (hole) => hole.winning_side === "team_a"
+    ).length;
+    const teamBWins = validHoles.filter(
+      (hole) => hole.winning_side === "team_b"
+    ).length;
+
+    const holesPlayed = validHoles.length;
+    const holesRemaining = Math.max(0, holeCount - holesPlayed);
+    const margin = Math.abs(teamAWins - teamBWins);
+
+    const isOfficial =
+      holesPlayed >= holeCount || margin > holesRemaining;
+
+    const winningSide = !isOfficial
+      ? null
+      : teamAWins === teamBWins
+        ? "halved"
+        : teamAWins > teamBWins
+          ? "team_a"
+          : "team_b";
+
+    const finalResult = !isOfficial
+      ? null
+      : winningSide === "halved"
+        ? "Halved"
+        : holesPlayed >= holeCount
+          ? `${margin} Up`
+          : `${margin} & ${holesRemaining}`;
+
+    const { error: updateError } = await supabase
       .from("matches")
       .update({
-        is_official: false,
-        winning_side: null,
-        final_result: null,
+        is_official: isOfficial,
+        winning_side: winningSide,
+        final_result: finalResult,
       })
       .eq("id", match.id);
 
-    if (resetError) {
+    if (updateError) {
       return NextResponse.json(
-        { error: resetError.message },
+        { error: updateError.message },
         { status: 500 }
       );
     }
