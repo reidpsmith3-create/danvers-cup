@@ -203,9 +203,14 @@ export default async function Home() {
             </p>
 
 <div
-  className="overflow-hidden rounded-3xl border border-danvers-green/30 bg-gradient-to-br from-danvers-surface to-black/50 bg-cover bg-center shadow-xl shadow-black/20"
+  className="group relative overflow-hidden rounded-3xl border border-danvers-green/30 bg-gradient-to-br from-danvers-surface to-black/50 bg-cover bg-center shadow-xl shadow-black/20 transition-all hover:border-danvers-gold/60"
   style={nextRoundStyle}
 >
+  <Link
+    href={`/history/${season?.year ?? 2026}/rounds/${nextRound.id}`}
+    className="absolute inset-0 z-10"
+    aria-label={`View Round ${nextRound.round_number}: ${nextRound.name}`}
+  />
               <div className="h-1 bg-gradient-to-r from-danvers-green via-danvers-gold to-danvers-green" />
 
               <div className="min-h-[260px] p-5 flex flex-col justify-end">
@@ -220,7 +225,7 @@ export default async function Home() {
                     <h2 className="text-2xl font-black">{nextRound.name}</h2>
                     <Link
   href={`/courses/${nextRound.course_id}`}
-  className="mt-2 block text-sm font-black text-danvers-gold hover:underline"
+  className="relative z-20 mt-2 block text-sm font-black text-danvers-gold hover:underline"
 >
   {course?.name}
 </Link>
@@ -251,7 +256,7 @@ export default async function Home() {
                   Trip Itinerary
                 </p>
                 <h2 className="mt-3 text-2xl font-black">
-                  Three Rounds. Three Courses. One Cup.
+                  Three Days. Three Courses. One Cup.
                 </h2>
               </div>
 
@@ -286,23 +291,36 @@ export default async function Home() {
             </div>
 
             <div className="mt-4 grid gap-2">
-              {["Caledonia", "King's North", "Prestwick"].map((course, index) => (
-                <div
-                  key={course}
-                  className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/25 px-4 py-3"
-                >
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-danvers-gold">
-                      Round {index + 1}
-                    </p>
-                    <p className="mt-1 text-sm font-bold text-white">
-                      {course}
-                    </p>
-                  </div>
+              {rounds?.map((round) => {
+                const course = getSingleRelation(round.courses);
+                const session =
+                  round.name.toLowerCase().includes("morning")
+                    ? "Morning"
+                    : round.name.toLowerCase().includes("afternoon")
+                      ? "Afternoon"
+                      : null;
 
-                  <span className="text-sm text-danvers-muted">→</span>
-                </div>
-              ))}
+                return (
+                  <Link
+                    key={round.id}
+                    href={`/history/${season?.year ?? 2026}/rounds/${round.id}`}
+                    className="group flex items-center justify-between rounded-2xl border border-white/10 bg-black/25 px-4 py-3 transition-all hover:border-danvers-gold/40 hover:bg-danvers-green/15"
+                  >
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-danvers-gold">
+                        Round {round.round_number}
+                        {session ? ` · ${session}` : ""}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-white">
+                        {course?.name ?? round.name}
+                      </p>
+                    </div>
+                    <span className="text-sm text-danvers-muted transition-transform group-hover:translate-x-1">
+                      →
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </section>
