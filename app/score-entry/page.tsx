@@ -87,13 +87,27 @@ export default async function ScoreEntryPage({
         .order("hole_number", { ascending: true })
     : { data: [] };
 
+  const roundHoleCount = Number(round?.hole_count ?? 18);
+  const roundNineType = round?.nine_type ?? null;
+
+  const allowedHoleNumbers =
+    roundHoleCount === 9
+      ? roundNineType === "back"
+        ? Array.from({ length: 9 }, (_, index) => index + 10)
+        : Array.from({ length: 9 }, (_, index) => index + 1)
+      : Array.from({ length: 18 }, (_, index) => index + 1);
+
   const holes =
-    courseHoles?.map((hole: any) => ({
-      holeNumber: hole.hole_number,
-      par: hole.par,
-      yardage: hole.yardage,
-      handicapNumber: hole.handicap_number,
-    })) ?? [];
+    courseHoles
+      ?.filter((hole: any) =>
+        allowedHoleNumbers.includes(Number(hole.hole_number))
+      )
+      .map((hole: any) => ({
+        holeNumber: hole.hole_number,
+        par: hole.par,
+        yardage: hole.yardage,
+        handicapNumber: hole.handicap_number,
+      })) ?? [];
 
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
@@ -170,6 +184,7 @@ export default async function ScoreEntryPage({
   groupName={selectedGroup?.name ?? null}
   players={scorePlayers}
   holes={holes}
+  allowedHoleNumbers={allowedHoleNumbers}
 />
         ) : (
           <p className="mt-6 text-danvers-muted">No round found.</p>

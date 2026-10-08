@@ -47,6 +47,7 @@ type ScoreEntryFormProps = {
   groupName: string | null;
   players: ScorePlayer[];
   holes: CourseHole[];
+  allowedHoleNumbers: number[];
 };
 
 type ScoreState = {
@@ -61,8 +62,12 @@ export default function ScoreEntryForm({
   groupName,
   players,
   holes,
+  allowedHoleNumbers,
 }: ScoreEntryFormProps) {
-  const [holeNumber, setHoleNumber] = useState(1);
+  const firstHole = allowedHoleNumbers[0] ?? 1;
+  const lastHole = allowedHoleNumbers[allowedHoleNumbers.length - 1] ?? 18;
+
+  const [holeNumber, setHoleNumber] = useState(firstHole);
   const [scores, setScores] = useState<ScoreState[]>([]);
   const [isLoadingScores, setIsLoadingScores] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -138,18 +143,14 @@ export default function ScoreEntryForm({
   }, [roundId, groupId, message]);
 
   useEffect(() => {
-    if (savedHoles.length === 0) {
-      setHoleNumber(1);
-      return;
-    }
-
     const firstUnsavedHole =
-      Array.from({ length: 18 })
-        .map((_, index) => index + 1)
-        .find((hole) => !savedHoles.includes(hole)) ?? 18;
+      Array.from(
+        { length: lastHole - firstHole + 1 },
+        (_, index) => firstHole + index
+      ).find((hole) => !savedHoles.includes(hole)) ?? lastHole;
 
     setHoleNumber(firstUnsavedHole);
-  }, [groupId, savedHoles]);
+  }, [roundId, groupId, savedHoles, firstHole, lastHole]);
 
   function updateScore(playerId: string, amount: number) {
     setScores((current) =>
@@ -390,8 +391,7 @@ export default function ScoreEntryForm({
   ) : null}
 
   <div className="mt-5 flex justify-center gap-2 overflow-x-auto pb-1">
-    {Array.from({ length: 18 }).map((_, index) => {
-      const hole = index + 1;
+    {allowedHoleNumbers.map((hole) => {
       const isActive = hole === holeNumber;
       const isSaved = savedHoles.includes(hole);
 
@@ -418,7 +418,7 @@ export default function ScoreEntryForm({
     <button
       type="button"
       onClick={() => goToHole(holeNumber - 1)}
-      disabled={holeNumber === 1 || isLoadingScores}
+      disabled={holeNumber <= firstHole || isLoadingScores}
       className="rounded-2xl border border-danvers-border bg-black/20 px-4 py-3 text-sm font-black text-danvers-text disabled:opacity-40"
     >
       ← Previous
@@ -427,7 +427,7 @@ export default function ScoreEntryForm({
     <button
       type="button"
       onClick={() => goToHole(holeNumber + 1)}
-      disabled={holeNumber === 18 || isLoadingScores}
+      disabled={holeNumber >= lastHole || isLoadingScores}
       className="rounded-2xl border border-danvers-border bg-black/20 px-4 py-3 text-sm font-black text-danvers-text disabled:opacity-40"
     >
       Next →
