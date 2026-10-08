@@ -199,7 +199,9 @@ export default function ScoreEntryForm({
     const savedHole = holeNumber;
 
     setMessage(
-      `Saved Hole ${savedHole}. Moving to Hole ${Math.min(18, savedHole + 1)}.`
+      savedHole === 18
+        ? "Final hole saved."
+        : `Saved Hole ${savedHole}. Moving to Hole ${savedHole + 1}.`
     );
 
     setSavedHoles((current) =>
@@ -336,7 +338,7 @@ export default function ScoreEntryForm({
   {match.status}
 </p>
 
-{match.status.includes("wins") || match.status === "Match Halved" ? (
+{match.isFinal ? (
   <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-danvers-gold">
     Final
   </p>

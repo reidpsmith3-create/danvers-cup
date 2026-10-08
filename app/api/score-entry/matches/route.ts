@@ -216,6 +216,7 @@ const matchupLabel = `${shortA} vs ${shortB}`;
       leaderColor,
       matchupLabel,
       status,
+      isFinal: Boolean(match.is_official),
       holesScored: holes.length,
       latestVegasHole:
         isVegas && latestHole
