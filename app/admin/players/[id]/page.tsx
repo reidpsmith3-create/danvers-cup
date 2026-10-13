@@ -5,6 +5,9 @@ import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCurrentSeason } from "@/lib/currentSeason";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type AdminPlayerEditPageProps = {
   params: {
     id: string;
