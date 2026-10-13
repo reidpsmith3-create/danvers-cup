@@ -31,8 +31,13 @@ function makeVegasNumber(
   score2: number,
   flipped: boolean
 ): number {
-  const low = Math.min(score1, score2);
-  const high = Math.max(score1, score2);
+  // Cap each individual score at 9 for Vegas only.
+  // Actual gross scores remain unchanged in the database.
+  const cappedScore1 = Math.min(score1, 9);
+  const cappedScore2 = Math.min(score2, 9);
+
+  const low = Math.min(cappedScore1, cappedScore2);
+  const high = Math.max(cappedScore1, cappedScore2);
 
   return flipped
     ? high * 10 + low
@@ -59,12 +64,11 @@ export function calculateVegasHole({
       (score) =>
         !Number.isFinite(score) ||
         !Number.isInteger(score) ||
-        score <= 0 ||
-        score >= 10
+        score <= 0
     )
   ) {
     throw new Error(
-      "Vegas scoring requires four positive single-digit whole-number scores."
+      "Vegas scoring requires four positive whole-number scores."
     );
   }
 

@@ -132,8 +132,8 @@ export async function POST(request: Request) {
 
   /*
    * Validate Vegas-specific scores before writing anything.
-   * Only players in Vegas matches covering this hole require
-   * single-digit gross scores.
+   * Vegas uses actual gross scores for storage and caps
+   * scores at 9 only when calculating the Vegas number.
    */
   const { data: vegasCompetitions, error: vegasCompetitionError } =
     await supabase
@@ -189,21 +189,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const invalidVegasScore = scores.some(
-      (score) =>
-        vegasPlayerIds.has(score.playerId) &&
-        score.grossScore > 9
-    );
 
-    if (invalidVegasScore) {
-      return NextResponse.json(
-        {
-          error:
-            "Vegas players must enter whole-number scores from 1 through 9.",
-        },
-        { status: 400 }
-      );
-    }
   }
 
   // Check whether any submitted score actually changes.
@@ -541,16 +527,16 @@ export async function POST(request: Request) {
 
       const hasInvalidVegasScore = allVegasScores.some(
         (score) =>
+          !Number.isFinite(score) ||
           !Number.isInteger(score) ||
-          score <= 0 ||
-          score >= 10
+          score <= 0
       );
 
       if (hasInvalidVegasScore) {
         return NextResponse.json(
           {
             error:
-              "Vegas scores must be positive single-digit whole numbers from 1 through 9.",
+              "Vegas scores must be positive whole numbers.",
           },
           { status: 400 }
         );
