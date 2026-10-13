@@ -197,10 +197,10 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
 
         <section className="mt-8 grid gap-4 sm:grid-cols-2">
           {players.map((player) => (
-            <div key={player.id} className="min-w-0">
+            <div key={player.id} className="flex min-w-0 flex-col">
             <Link
               href={`/players/${player.id}`}
-              className="group overflow-hidden rounded-[2rem] border border-danvers-green/30 bg-gradient-to-br from-danvers-surface to-black/50 shadow-xl shadow-black/20 transition hover:border-danvers-gold/60"
+              className="group block flex-1 overflow-hidden rounded-[2rem] border border-danvers-green/30 bg-gradient-to-br from-danvers-surface to-black/50 shadow-xl shadow-black/20 transition hover:border-danvers-gold/60"
             >
               <div className="h-1 bg-gradient-to-r from-danvers-green via-danvers-gold to-danvers-green" />
 

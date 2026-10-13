@@ -2,6 +2,7 @@ import Link from "next/link";
 import PlayerProfileForm from "@/components/admin/PlayerProfileForm";
 import PlayerSponsorsManager from "@/components/admin/PlayerSponsorsManager";
 import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCurrentSeason } from "@/lib/currentSeason";
 
 type AdminPlayerEditPageProps = {
@@ -32,11 +33,11 @@ export default async function AdminPlayerEditPage({
     { data: sponsors, error: sponsorsError },
     { data: assignments, error: assignmentsError },
   ] = await Promise.all([
-    supabase
+    supabaseAdmin
       .from("sponsors")
       .select("id, name, logo_url, website_url")
       .order("name", { ascending: true }),
-    supabase
+    supabaseAdmin
       .from("player_sponsors")
       .select("sponsor_id, display_order")
       .eq("player_id", params.id)
