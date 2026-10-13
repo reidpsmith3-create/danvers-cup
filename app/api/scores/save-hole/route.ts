@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { requireScorekeeperApi } from "@/lib/auth/requireScorekeeperApi";
+import { validateScoreRequest } from "@/lib/scoring/validateScoreRequest";
+import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { invalidateCompetitionResults } from "@/lib/scoring/invalidateCompetitionResults";
 import {
   calculateVegasHole,
@@ -80,6 +82,9 @@ function getMatchResult(holes: any[], holeCount: number) {
 }
 
 export async function POST(request: Request) {
+  const authError = await requireScorekeeperApi(request);
+  if (authError) return authError;
+
   const body = await request.json();
 
   const roundId = body.roundId;
@@ -91,6 +96,114 @@ export async function POST(request: Request) {
       { error: "Missing roundId, holeNumber, or scores." },
       { status: 400 }
     );
+  }
+
+  if (
+    scores.length === 0 ||
+    scores.length > 24 ||
+    !scores.every(
+      (score) =>
+        score !== null &&
+        typeof score === "object" &&
+        typeof score.playerId === "string" &&
+        Number.isInteger(score.grossScore) &&
+        score.grossScore >= 1 &&
+        score.grossScore <= 30
+    )
+  ) {
+    return NextResponse.json(
+      { error: "Scores must be whole numbers from 1 through 30." },
+      { status: 400 }
+    );
+  }
+
+  const validation = await validateScoreRequest(
+    roundId,
+    holeNumber,
+    scores.map((score) => score.playerId)
+  );
+
+  if (!validation.valid) {
+    return NextResponse.json(
+      { error: validation.error },
+      { status: 400 }
+    );
+  }
+
+  /*
+   * Validate Vegas-specific scores before writing anything.
+   * Only players in Vegas matches covering this hole require
+   * single-digit gross scores.
+   */
+  const { data: vegasCompetitions, error: vegasCompetitionError } =
+    await supabase
+      .from("competitions")
+      .select("id, settings")
+      .eq("round_id", roundId)
+      .eq("format", "vegas");
+
+  if (vegasCompetitionError) {
+    return NextResponse.json(
+      { error: vegasCompetitionError.message },
+      { status: 500 }
+    );
+  }
+
+  const applicableVegasIds = (vegasCompetitions ?? [])
+    .filter((competition) => {
+      const settings = (competition as any).settings ?? {};
+      const holeCount = Number(settings.holeCount ?? 9);
+
+      return getVegasCompetitionHoles({
+        holeCount,
+        nineType:
+          holeCount === 9
+            ? String(settings.nineType ?? "front")
+            : null,
+      }).includes(holeNumber);
+    })
+    .map((competition) => competition.id);
+
+  if (applicableVegasIds.length > 0) {
+    const { data: vegasMatches, error: vegasMatchesError } =
+      await supabase
+        .from("matches")
+        .select("team_a_player_ids, team_b_player_ids")
+        .in("competition_id", applicableVegasIds);
+
+    if (vegasMatchesError) {
+      return NextResponse.json(
+        { error: vegasMatchesError.message },
+        { status: 500 }
+      );
+    }
+
+    const vegasPlayerIds = new Set<string>();
+
+    for (const match of vegasMatches ?? []) {
+      for (const playerId of [
+        ...(match.team_a_player_ids ?? []),
+        ...(match.team_b_player_ids ?? []),
+      ]) {
+        vegasPlayerIds.add(playerId);
+      }
+    }
+
+    const invalidVegasScore = scores.some(
+      (score) =>
+        vegasPlayerIds.has(score.playerId) &&
+        score.grossScore > 9
+    );
+
+    if (invalidVegasScore) {
+      return NextResponse.json(
+        {
+          error:
+            "Vegas players must enter whole-number scores from 1 through 9.",
+        },
+        { status: 400 }
+      );
+    }
   }
 
   // Check whether any submitted score actually changes.
@@ -136,27 +249,25 @@ export async function POST(request: Request) {
    * Save the submitted individual gross scores first.
    * These remain the source of truth for every competition format.
    */
-  for (const score of scores) {
-    await supabase
-      .from("scores")
-      .delete()
-      .eq("round_id", roundId)
-      .eq("player_id", score.playerId)
-      .eq("hole_number", holeNumber);
+  const { error: saveError } = await supabase
+    .from("scores")
+    .upsert(
+      scores.map((score) => ({
+        round_id: roundId,
+        player_id: score.playerId,
+        hole_number: holeNumber,
+        gross_score: score.grossScore,
+      })),
+      {
+        onConflict: "round_id,player_id,hole_number",
+      }
+    );
 
-    const { error } = await supabase.from("scores").insert({
-      round_id: roundId,
-      player_id: score.playerId,
-      hole_number: holeNumber,
-      gross_score: score.grossScore,
-    });
-
-    if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
-    }
+  if (saveError) {
+    return NextResponse.json(
+      { error: saveError.message },
+      { status: 500 }
+    );
   }
 
   /*

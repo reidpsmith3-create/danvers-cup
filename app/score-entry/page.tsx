@@ -1,4 +1,14 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import ScorekeeperLogin from "@/components/score-entry/ScorekeeperLogin";
+import {
+  SCOREKEEPER_COOKIE_NAME,
+  verifyScorekeeperSession,
+} from "@/lib/auth/scorekeeperSession";
+import {
+  ADMIN_COOKIE_NAME,
+  verifyAdminSession,
+} from "@/lib/auth/adminSession";
 import { supabase } from "@/lib/supabase";
 import ScoreEntryForm from "@/components/score-entry/ScoreEntryForm";
 import { getCurrentSeason } from "@/lib/currentSeason";
@@ -16,6 +26,26 @@ type ScoreEntryPageProps = {
 export default async function ScoreEntryPage({
   searchParams,
 }: ScoreEntryPageProps) {
+  const cookieStore = cookies();
+
+  const scorekeeperToken =
+    cookieStore.get(SCOREKEEPER_COOKIE_NAME)?.value;
+
+  const adminToken =
+    cookieStore.get(ADMIN_COOKIE_NAME)?.value;
+
+  const authorized =
+    (await verifyScorekeeperSession(scorekeeperToken)) ||
+    (await verifyAdminSession(adminToken));
+
+  if (!authorized) {
+    return (
+      <main className="min-h-screen px-5 pb-24 pt-6">
+        <ScorekeeperLogin />
+      </main>
+    );
+  }
+
   const requestedRoundNumber = searchParams?.round
     ? Number(searchParams.round)
     : null;

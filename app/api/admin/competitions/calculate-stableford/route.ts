@@ -1,9 +1,13 @@
+import { requireAdminApi } from "@/lib/auth/requireAdminApi";
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { calculateStablefordResults } from "@/lib/scoring/stableford";
 import { calculateTeamAggregateResults } from "@/lib/scoring/teamAggregate";
 
 export async function POST(request: Request) {
+  const authError = await requireAdminApi(request);
+  if (authError) return authError;
+
   const body = await request.json();
 
   const competitionId = body.competitionId;

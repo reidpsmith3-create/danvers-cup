@@ -1,8 +1,12 @@
+import { requireAdminApi } from "@/lib/auth/requireAdminApi";
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { calculateBestBallMatch } from "@/lib/scoring/bestBall";
 
 export async function POST(request: Request) {
+  const authError = await requireAdminApi(request);
+  if (authError) return authError;
+
   const body = await request.json();
 
   const competitionId = body.competitionId;

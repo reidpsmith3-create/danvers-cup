@@ -1,3 +1,4 @@
+import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import Link from "next/link";
 import FinalizeSeasonButton from "@/components/admin/FinalizeSeasonButton";
 import { getCurrentSeason } from "@/lib/currentSeason";
@@ -85,10 +86,17 @@ export default async function AdminPage() {
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
       <section className="mx-auto max-w-5xl">
         <div className="rounded-[2rem] border border-danvers-border bg-danvers-surface p-6">
-          <p className="text-xs font-bold uppercase tracking-[0.35em] text-danvers-brass">
-            Admin
-          </p>
-          <h1 className="mt-4 text-5xl font-black">Commissioner Tools</h1>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.35em] text-danvers-brass">
+                Admin
+              </p>
+              <h1 className="mt-4 text-4xl font-black sm:text-5xl">
+                Commissioner Tools
+              </h1>
+            </div>
+            <AdminLogoutButton />
+          </div>
           <p className="mt-3 text-danvers-muted">
             Manage homepage content, competitions, matches, scoring, and
             official results.

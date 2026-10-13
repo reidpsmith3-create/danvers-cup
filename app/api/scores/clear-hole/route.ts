@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { requireScorekeeperApi } from "@/lib/auth/requireScorekeeperApi";
+import { validateScoreRequest } from "@/lib/scoring/validateScoreRequest";
+import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { invalidateCompetitionResults } from "@/lib/scoring/invalidateCompetitionResults";
 import {
   calculateVegasMatch,
@@ -7,6 +9,9 @@ import {
 } from "@/lib/scoring/vegasScoring";
 
 export async function POST(request: Request) {
+  const authError = await requireScorekeeperApi(request);
+  if (authError) return authError;
+
   const body = await request.json();
 
   const roundId = body.roundId as string;
@@ -16,6 +21,19 @@ export async function POST(request: Request) {
   if (!roundId || !holeNumber || !Array.isArray(playerIds)) {
     return NextResponse.json(
       { error: "Missing roundId, holeNumber, or playerIds." },
+      { status: 400 }
+    );
+  }
+
+  const validation = await validateScoreRequest(
+    roundId,
+    holeNumber,
+    playerIds
+  );
+
+  if (!validation.valid) {
+    return NextResponse.json(
+      { error: validation.error },
       { status: 400 }
     );
   }
