@@ -574,10 +574,45 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
               Bio
             </p>
 
-            <p className="mt-4 leading-7 text-danvers-muted">
-              {player.bio ??
-                "Career history, player notes, photos, and Danvers Cup records coming soon."}
-            </p>
+            {player.bio ? (
+              <ul className="mt-5 space-y-4">
+                {player.bio
+                  .replace(
+                    /\s*(Hometown|Current City|Greatest Golf Accomplishment|Golf Superstition|Superstition|Quote):\s*/gi,
+                    "\\n$1: "
+                  )
+                  .split("\\n")
+                  .map((entry: string) => entry.trim())
+                  .filter(Boolean)
+                  .map((entry: string, index: number) => {
+                    const separator = entry.indexOf(":");
+                    const label =
+                      separator >= 0 ? entry.slice(0, separator) : null;
+                    const value =
+                      separator >= 0 ? entry.slice(separator + 1).trim() : entry;
+
+                    return (
+                      <li key={index} className="flex items-start gap-3">
+                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-danvers-gold" />
+                        <div>
+                          {label && (
+                            <p className="text-xs font-bold uppercase tracking-wider text-danvers-gold">
+                              {label}
+                            </p>
+                          )}
+                          <p className="mt-1 leading-6 text-danvers-muted">
+                            {value}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+              </ul>
+            ) : (
+              <p className="mt-4 leading-7 text-danvers-muted">
+                Career history, player notes, photos, and Danvers Cup records coming soon.
+              </p>
+            )}
           </div>
         </section>
         <section className="mt-6 grid gap-4 sm:grid-cols-2">
