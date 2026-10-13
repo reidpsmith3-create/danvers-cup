@@ -109,7 +109,7 @@ export default async function MatchPage({ params }: MatchPageProps) {
   const { data: match } = await supabase
     .from("matches")
     .select(
-      "*, competitions(id, name, format, season_id, settings, rounds(course_id)), team_a:teams!matches_team_a_id_fkey(id, name, color, logo_url), team_b:teams!matches_team_b_id_fkey(id, name, color, logo_url)"
+      "*, competitions(id, name, format, season_id, round_id, settings, rounds(course_id)), team_a:teams!matches_team_a_id_fkey(id, name, color, logo_url), team_b:teams!matches_team_b_id_fkey(id, name, color, logo_url)"
     )
     .eq("id", params.id)
     .single();
@@ -161,6 +161,33 @@ export default async function MatchPage({ params }: MatchPageProps) {
       id: row.player_id,
       full_name: row.players?.full_name ?? "Unknown Player",
     })) ?? [];
+
+  // Retrieve actual gross scores for players in this match.
+  const matchPlayerIds = [
+    ...new Set([
+      ...(match.team_a_player_ids ?? []),
+      ...(match.team_b_player_ids ?? []),
+    ]),
+  ];
+
+  const matchRoundId = match.competitions?.round_id;
+
+  const { data: individualScores } =
+    matchRoundId && matchPlayerIds.length > 0
+      ? await supabase
+          .from("scores")
+          .select("player_id, hole_number, gross_score")
+          .eq("round_id", matchRoundId)
+          .in("player_id", matchPlayerIds)
+          .in("hole_number", holeNumbers)
+      : { data: [] };
+
+  const individualScoreMap = new Map(
+    (individualScores ?? []).map((score: any) => [
+      `${score.player_id}:${score.hole_number}`,
+      Number(score.gross_score),
+    ])
+  );
 
   const sideAPlayers =
     playerNames(match.team_a_player_ids ?? [], players) ??
@@ -586,6 +613,122 @@ export default async function MatchPage({ params }: MatchPageProps) {
             </table>
           </div>
         </section>
+
+        {matchPlayerIds.length > 0 && (
+          <section className="mt-6 rounded-[2rem] border border-danvers-border bg-danvers-surface p-5">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-brass">
+              Individual Scoring
+            </p>
+            <h2 className="mt-2 text-3xl font-black">
+              Player Scorecards
+            </h2>
+            <p className="mt-2 text-sm text-danvers-muted">
+              Actual gross scores for each player.
+            </p>
+
+            <div className="mt-5 overflow-x-auto rounded-2xl border border-danvers-border bg-black/20">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead>
+                  <tr className="border-b border-danvers-border text-left text-xs uppercase tracking-[0.2em] text-danvers-muted">
+                    <th className="sticky left-0 z-10 bg-danvers-surface p-3">
+                      Player
+                    </th>
+                    {scorecardHoles.map((hole) => (
+                      <th key={hole.holeNumber} className="p-3 text-center">
+                        {hole.holeNumber}
+                      </th>
+                    ))}
+                    <th className="p-3 text-center">Total</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr className="border-b border-danvers-border text-danvers-muted">
+                    <td className="sticky left-0 z-10 bg-danvers-surface p-3 font-black">
+                      Par
+                    </td>
+                    {scorecardHoles.map((hole) => (
+                      <td key={hole.holeNumber} className="p-3 text-center font-black">
+                        {hole.par ?? "—"}
+                      </td>
+                    ))}
+                    <td className="p-3 text-center font-black">
+                      {parTotal || "—"}
+                    </td>
+                  </tr>
+
+                  {[
+                    {
+                      ids: match.team_a_player_ids ?? [],
+                      color: sideAColor,
+                      name: sideATeamName,
+                    },
+                    {
+                      ids: match.team_b_player_ids ?? [],
+                      color: sideBColor,
+                      name: sideBTeamName,
+                    },
+                  ].flatMap((side) =>
+                    side.ids.map((playerId: string) => {
+                      const player = players.find((p) => p.id === playerId);
+
+                      const playerScores = scorecardHoles.map((hole) =>
+                        individualScoreMap.get(
+                          `${playerId}:${hole.holeNumber}`
+                        ) ?? null
+                      );
+
+                      const total = playerScores.reduce(
+                        (sum: number, score: number | null) =>
+                          sum + (score ?? 0),
+                        0
+                      );
+
+                      const hasScores = playerScores.some(
+                        (score) => score !== null
+                      );
+
+                      return (
+                        <tr
+                          key={playerId}
+                          className="border-b border-danvers-border last:border-0"
+                        >
+                          <td className="sticky left-0 z-10 bg-danvers-surface p-3">
+                            <div className="font-black">
+                              {player?.full_name ?? "Unknown Player"}
+                            </div>
+                            <div
+                              className="mt-1 text-[10px] font-bold uppercase tracking-wider"
+                              style={{ color: side.color }}
+                            >
+                              {side.name}
+                            </div>
+                          </td>
+
+                          {scorecardHoles.map((hole, index) => (
+                            <td
+                              key={hole.holeNumber}
+                              className="p-2 text-center"
+                            >
+                              <ScoreBadge
+                                score={playerScores[index]}
+                                par={hole.par}
+                              />
+                            </td>
+                          ))}
+
+                          <td className="p-3 text-center font-black">
+                            {hasScores ? total : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
       </section>
     </main>
   );
