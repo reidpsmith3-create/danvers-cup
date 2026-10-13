@@ -271,7 +271,7 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                   Sponsored By
                 </p>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center justify-center gap-3">
                   {player.sponsors.map((sponsor: SponsorInfo) => {
                     const logo = (
                       // eslint-disable-next-line @next/next/no-img-element
