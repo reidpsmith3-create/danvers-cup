@@ -79,12 +79,36 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
     );
   });
 
+  const { data: sponsorAssignmentsData } = await supabase
+    .from("player_sponsors")
+    .select("player_id, display_order, sponsors(id, name, logo_url, website_url)")
+    .order("display_order", { ascending: true });
+
+  type SponsorInfo = {
+    id: string;
+    name: string;
+    logo_url: string;
+    website_url: string | null;
+  };
+
+  const sponsorsByPlayerId = new Map<string, SponsorInfo[]>();
+
+  for (const assignment of (sponsorAssignmentsData ?? []) as any[]) {
+    const sponsor = getSingleRelation<SponsorInfo>(assignment.sponsors);
+    if (!sponsor) continue;
+
+    const existing = sponsorsByPlayerId.get(assignment.player_id) ?? [];
+    existing.push(sponsor);
+    sponsorsByPlayerId.set(assignment.player_id, existing);
+  }
+
   const allPlayers = ((allPlayersData as any[]) ?? []).map((player) => ({
     ...player,
     isCurrent: currentPlayerIds.has(player.id),
     handicap: handicapByPlayerId.get(player.id) ?? null,
     appearances: appearancesByPlayerId.get(player.id) ?? 0,
     points: pointsByPlayerId.get(player.id) ?? 0,
+    sponsors: sponsorsByPlayerId.get(player.id) ?? [],
   }));
 
   const players =
@@ -173,9 +197,9 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
 
         <section className="mt-8 grid gap-4 sm:grid-cols-2">
           {players.map((player) => (
+            <div key={player.id} className="min-w-0">
             <Link
               href={`/players/${player.id}`}
-              key={player.id}
               className="group overflow-hidden rounded-[2rem] border border-danvers-green/30 bg-gradient-to-br from-danvers-surface to-black/50 shadow-xl shadow-black/20 transition hover:border-danvers-gold/60"
             >
               <div className="h-1 bg-gradient-to-r from-danvers-green via-danvers-gold to-danvers-green" />
@@ -240,6 +264,49 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                 </p>
               </div>
             </Link>
+
+            {player.sponsors.length > 0 ? (
+              <div className="mt-2 rounded-2xl border border-danvers-green/30 bg-danvers-surface/80 px-4 py-3">
+                <p className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-danvers-muted">
+                  Sponsored By
+                </p>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  {player.sponsors.map((sponsor: SponsorInfo) => {
+                    const logo = (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={sponsor.logo_url}
+                        alt={sponsor.name}
+                        title={sponsor.name}
+                        className="h-10 max-w-28 object-contain"
+                      />
+                    );
+
+                    return sponsor.website_url ? (
+                      <a
+                        key={sponsor.id}
+                        href={sponsor.website_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Visit ${sponsor.name}`}
+                        className="flex min-h-14 items-center justify-center rounded-xl bg-white px-3 py-2 transition hover:opacity-80"
+                      >
+                        {logo}
+                      </a>
+                    ) : (
+                      <div
+                        key={sponsor.id}
+                        className="flex min-h-14 items-center justify-center rounded-xl bg-white px-3 py-2"
+                      >
+                        {logo}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+            </div>
           ))}
         </section>
       </section>

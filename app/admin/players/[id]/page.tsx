@@ -1,5 +1,6 @@
 import Link from "next/link";
 import PlayerProfileForm from "@/components/admin/PlayerProfileForm";
+import PlayerSponsorsManager from "@/components/admin/PlayerSponsorsManager";
 import { supabase } from "@/lib/supabase";
 import { getCurrentSeason } from "@/lib/currentSeason";
 
@@ -26,6 +27,21 @@ export default async function AdminPlayerEditPage({
     .eq("season_id", season?.id)
     .eq("player_id", params.id)
     .single();
+
+  const [
+    { data: sponsors, error: sponsorsError },
+    { data: assignments, error: assignmentsError },
+  ] = await Promise.all([
+    supabase
+      .from("sponsors")
+      .select("id, name, logo_url, website_url")
+      .order("name", { ascending: true }),
+    supabase
+      .from("player_sponsors")
+      .select("sponsor_id, display_order")
+      .eq("player_id", params.id)
+      .order("display_order", { ascending: true }),
+  ]);
 
   if (!player) {
     return (
@@ -69,6 +85,18 @@ export default async function AdminPlayerEditPage({
         <div className="mt-6">
           <PlayerProfileForm player={player} seasonPlayer={seasonPlayer} />
         </div>
+
+        {sponsorsError || assignmentsError ? (
+          <p className="mt-6 rounded-2xl border border-red-500/30 p-4 text-sm text-red-300">
+            Unable to load player sponsors. Please refresh and try again.
+          </p>
+        ) : (
+          <PlayerSponsorsManager
+            playerId={player.id}
+            sponsors={sponsors ?? []}
+            assignments={assignments ?? []}
+          />
+        )}
       </section>
     </main>
   );

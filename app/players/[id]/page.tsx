@@ -217,6 +217,27 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     );
   }
 
+  const { data: sponsorAssignments } = await supabase
+    .from("player_sponsors")
+    .select("display_order, sponsors(id, name, logo_url, website_url)")
+    .eq("player_id", params.id)
+    .order("display_order", { ascending: true });
+
+  type SponsorInfo = {
+    id: string;
+    name: string;
+    logo_url: string;
+    website_url: string | null;
+  };
+
+  const playerSponsors: SponsorInfo[] = (
+    (sponsorAssignments ?? []) as any[]
+  )
+    .map((assignment) =>
+      getSingleRelation<SponsorInfo>(assignment.sponsors)
+    )
+    .filter((sponsor): sponsor is SponsorInfo => sponsor !== null);
+
   const { data: seasonPlayers } = await supabase
     .from("season_players")
     .select("handicap, seasons(id, year, name, location, status)")
@@ -474,6 +495,48 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
             </div>
           </div>
         </section>
+
+        {playerSponsors.length > 0 ? (
+          <section className="mt-6 rounded-[2rem] border border-danvers-green/30 bg-danvers-surface/80 p-6">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
+              Sponsored By
+            </p>
+
+            <div className="mt-5 flex flex-wrap items-center gap-4">
+              {playerSponsors.map((sponsor) => {
+                const logo = (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={sponsor.logo_url}
+                    alt={sponsor.name}
+                    title={sponsor.name}
+                    className="h-16 max-w-40 object-contain"
+                  />
+                );
+
+                return sponsor.website_url ? (
+                  <a
+                    key={sponsor.id}
+                    href={sponsor.website_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Visit ${sponsor.name}`}
+                    className="flex min-h-24 items-center justify-center rounded-2xl bg-white px-5 py-4 transition hover:opacity-80"
+                  >
+                    {logo}
+                  </a>
+                ) : (
+                  <div
+                    key={sponsor.id}
+                    className="flex min-h-24 items-center justify-center rounded-2xl bg-white px-5 py-4"
+                  >
+                    {logo}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
 
         <section className="mt-6 grid gap-4 sm:grid-cols-2">
           <div className="rounded-[2rem] border border-white/10 bg-danvers-surface/80 p-6">

@@ -26,6 +26,12 @@ const adminLinks = [
       "Manage player bios, photos, handicaps, and Danvers Cup profiles.",
   },
   {
+    href: "/admin/sponsors",
+    title: "Sponsors",
+    description:
+      "Manage sponsor logos, websites, and player sponsorships.",
+  },
+  {
   href: "/admin/teams",
   title: "Teams",
   description: "Manage yearly teams, logos, colors, and roster assignments.",

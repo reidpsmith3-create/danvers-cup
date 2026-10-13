@@ -1,6 +1,5 @@
 "use client";
 
-import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -28,23 +27,22 @@ export default function PlayerProfileForm({
   const [message, setMessage] = useState("");
 
   async function uploadPhoto(file: File) {
-    const extension = file.name.split(".").pop();
-    const path = `players/${player.id}-${Date.now()}.${extension}`;
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("category", "players");
 
-    const { error } = await supabase.storage
-      .from("site-assets")
-      .upload(path, file, {
-        cacheControl: "3600",
-        upsert: true,
-      });
+    const response = await fetch("/api/admin/uploads", {
+      method: "POST",
+      body: formData,
+    });
 
-    if (error) {
-      throw new Error(error.message);
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error ?? "Photo upload failed.");
     }
 
-    const { data } = supabase.storage.from("site-assets").getPublicUrl(path);
-
-    return data.publicUrl;
+    return String(result.url);
   }
 
   async function handleSubmit(formData: FormData) {
