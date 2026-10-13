@@ -153,7 +153,7 @@ export default function PlayerSponsorsManager({
                 className="flex flex-col gap-4 rounded-2xl border border-danvers-border p-4 sm:flex-row sm:items-center"
               >
                 <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded-xl bg-white p-2">
+                  <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded-xl bg-transparent p-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={sponsor.logo_url}

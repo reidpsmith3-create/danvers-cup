@@ -290,14 +290,14 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                         target="_blank"
                         rel="noopener noreferrer"
                         aria-label={`Visit ${sponsor.name}`}
-                        className="flex min-h-14 items-center justify-center rounded-xl bg-white px-3 py-2 transition hover:opacity-80"
+                        className="flex min-h-14 items-center justify-center rounded-xl bg-transparent px-3 py-2 transition hover:opacity-80"
                       >
                         {logo}
                       </a>
                     ) : (
                       <div
                         key={sponsor.id}
-                        className="flex min-h-14 items-center justify-center rounded-xl bg-white px-3 py-2"
+                        className="flex min-h-14 items-center justify-center rounded-xl bg-transparent px-3 py-2"
                       >
                         {logo}
                       </div>

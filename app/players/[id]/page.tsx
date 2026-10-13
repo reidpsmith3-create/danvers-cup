@@ -521,14 +521,14 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={`Visit ${sponsor.name}`}
-                    className="flex min-h-24 items-center justify-center rounded-2xl bg-white px-5 py-4 transition hover:opacity-80"
+                    className="flex min-h-24 items-center justify-center rounded-2xl bg-transparent px-5 py-4 transition hover:opacity-80"
                   >
                     {logo}
                   </a>
                 ) : (
                   <div
                     key={sponsor.id}
-                    className="flex min-h-24 items-center justify-center rounded-2xl bg-white px-5 py-4"
+                    className="flex min-h-24 items-center justify-center rounded-2xl bg-transparent px-5 py-4"
                   >
                     {logo}
                   </div>

@@ -256,7 +256,7 @@ export default function SponsorManager({
           </div>
 
           {logoUrl ? (
-            <div className="rounded-2xl border border-white/10 bg-white p-4">
+            <div className="rounded-2xl border border-white/10 bg-transparent p-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={logoUrl}
@@ -302,7 +302,7 @@ export default function SponsorManager({
                 key={sponsor.id}
                 className="rounded-[2rem] border border-white/10 bg-danvers-surface/80 p-5"
               >
-                <div className="rounded-2xl bg-white p-4">
+                <div className="rounded-2xl bg-transparent p-4">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={sponsor.logo_url}
