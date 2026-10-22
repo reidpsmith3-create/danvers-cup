@@ -1,6 +1,5 @@
 "use client";
 
-import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -40,23 +39,26 @@ export default function TeamForm({
   const [message, setMessage] = useState("");
 
   async function uploadLogo(file: File) {
-    const extension = file.name.split(".").pop();
-    const path = `teams/${team.id}-${Date.now()}.${extension}`;
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("category", "teams");
 
-    const { error } = await supabase.storage
-      .from("site-assets")
-      .upload(path, file, {
-        cacheControl: "3600",
-        upsert: true,
-      });
+    const response = await fetch("/api/admin/uploads", {
+      method: "POST",
+      body: formData,
+    });
 
-    if (error) {
-      throw new Error(error.message);
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error ?? "Team logo upload failed.");
     }
 
-    const { data } = supabase.storage.from("site-assets").getPublicUrl(path);
+    if (!result.url) {
+      throw new Error("Upload completed without a logo URL.");
+    }
 
-    return data.publicUrl;
+    return result.url as string;
   }
 
   async function handleSubmit(formData: FormData) {

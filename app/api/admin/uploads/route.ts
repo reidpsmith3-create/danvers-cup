@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const file = formData.get("file");
     const category = formData.get("category");
 
-    if (category !== "players" && category !== "sponsors") {
+    if (category !== "players" && category !== "sponsors" && category !== "teams") {
       return NextResponse.json(
         { error: "Invalid upload category." },
         { status: 400 }
