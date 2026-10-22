@@ -273,10 +273,16 @@ export default async function SchedulePage() {
                           </h3>
 
                           {event.description ? (
-                            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-danvers-muted">
-                              {event.description}
-                            </p>
-                          ) : null}
+  <details className="group mt-3">
+    <summary className="cursor-pointer text-sm font-bold text-danvers-gold">
+      <span className="group-open:hidden">Show Details +</span>
+      <span className="hidden group-open:inline">Hide Details −</span>
+    </summary>
+    <p className="mt-3 whitespace-pre-line text-sm leading-6 text-danvers-muted">
+      {event.description}
+    </p>
+  </details>
+) : null}
 
                           <p className="mt-3 text-sm font-bold text-danvers-muted">
   📍 {event.location ?? "Location TBD"}
