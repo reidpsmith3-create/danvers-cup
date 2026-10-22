@@ -2,6 +2,9 @@ import Link from "next/link";
 import SeasonForm from "@/components/admin/SeasonForm";
 import { supabase } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type EditSeasonPageProps = {
   params: {
     id: string;
