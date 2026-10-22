@@ -99,6 +99,19 @@ const players =
   const matchRows = (matches as any[]) ?? [];
   const matchHoleRows = (matchHoles as any[]) ?? [];
 
+  const { data: teams } = await supabase
+    .from("teams")
+    .select("id, name")
+    .eq("season_id", competition.season_id);
+
+  const teamNameById = new Map(
+    (teams ?? []).map((team) => [team.id, team.name])
+  );
+
+  function currentTeamName(teamId: string | null, fallback: string) {
+    return teamNameById.get(teamId) ?? fallback;
+  }
+
   return (
     <main className="min-h-screen px-5 pb-24 pt-6 text-danvers-text">
       <section className="mx-auto max-w-5xl">
@@ -248,7 +261,8 @@ return (
     </p>
 
     <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-danvers-brass">
-      {match.team_a_name ?? "Team A"} vs {match.team_b_name ?? "Team B"}
+      {currentTeamName(match.team_a_id, match.team_a_name ?? "Team A")} vs{" "}
+      {currentTeamName(match.team_b_id, match.team_b_name ?? "Team B")}
     </p>
 
     <p className="mt-1 text-sm text-danvers-muted">
