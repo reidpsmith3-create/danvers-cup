@@ -82,7 +82,27 @@ export default async function Home() {
     rounds?.[0];
 
   const liveRound = rounds?.find((round) => round.status === "live");
-  const daysUntilCup = getDaysUntil(season?.start_date ?? "2026-10-22");
+  const seasonIsActive = season?.status === "active";
+  const seasonIsComplete = season?.status === "complete";
+  const showCountdown =
+    season?.status === "upcoming" &&
+    getDaysUntil(season?.start_date ?? "2026-10-22") > 0;
+
+  const homepageStatusTitle = liveRound
+    ? settings?.live_title ?? "Live Now"
+    : seasonIsComplete
+      ? "Completed"
+      : seasonIsActive
+        ? "Danvers Cup Is Underway"
+        : settings?.scheduled_title ?? "Scheduled";
+
+  const homepageStatusSubtitle = liveRound
+    ? settings?.live_subtitle ?? `${liveRound.name} is underway`
+    : seasonIsComplete
+      ? "The 2026 Danvers Cup has concluded"
+      : seasonIsActive
+        ? "The trip has begun. Let the games begin!"
+        : settings?.scheduled_subtitle ?? "Myrtle Beach awaits";
 
   const heroStyle = settings?.hero_image_url
     ? {
@@ -151,7 +171,7 @@ export default async function Home() {
               <div className="flex items-center gap-2">
                 <span
                   className={`h-2.5 w-2.5 rounded-full ${
-                    liveRound ? "bg-green-400" : "bg-danvers-gold"
+                    liveRound || seasonIsActive ? "bg-green-400" : "bg-danvers-gold"
                   }`}
                 />
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-danvers-muted">
@@ -162,21 +182,17 @@ export default async function Home() {
               <div className="mt-4 flex items-end justify-between gap-5">
                 <div>
                   <h2 className="text-3xl font-black">
-                    {liveRound
-                      ? settings?.live_title ?? "Live Now"
-                      : settings?.scheduled_title ?? "Scheduled"}
+                    {homepageStatusTitle}
                   </h2>
                   <p className="mt-1 text-sm text-danvers-muted">
-                    {liveRound
-                      ? settings?.live_subtitle ??
-                        `${liveRound.name} is underway`
-                      : settings?.scheduled_subtitle ?? "Myrtle Beach awaits"}
+                    {homepageStatusSubtitle}
                   </p>
                 </div>
               </div>
             </div>
           </div>
         </section>
+        {showCountdown && (
 <section className="mt-6 rounded-[2rem] border border-danvers-gold/25 bg-gradient-to-br from-danvers-green/20 to-black/50 p-6 shadow-xl shadow-black/20">
   <p className="text-xs font-bold uppercase tracking-[0.3em] text-danvers-gold">
     Countdown
@@ -194,6 +210,7 @@ export default async function Home() {
     <Countdown targetDate="2026-10-22T08:00:00" />
   </div>
 </section>
+        )}
         {nextRound &&
           (() => {
             const course = getSingleRelation(nextRound.courses);
