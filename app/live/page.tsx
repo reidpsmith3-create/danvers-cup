@@ -234,6 +234,15 @@ export default async function LivePage() {
   const scoreRows = (scores as any[]) ?? [];
   const playerRows = (seasonPlayers as any[]) ?? [];
   const teamRows = (teams as any[]) ?? [];
+  const teamById = new Map(teamRows.map((team) => [team.id, team]));
+
+  function currentTeamName(teamId: string | null, fallback: string) {
+    return teamById.get(teamId)?.name ?? fallback;
+  }
+
+  function currentTeamColor(teamId: string | null) {
+    return teamById.get(teamId)?.color ?? "#1f7a4d";
+  }
   const teamMemberRows = (teamMembers as any[]) ?? [];
   const matchRows = (matches as any[]) ?? [];
   const matchHoleRows = (matchHoles as any[]) ?? [];
@@ -518,8 +527,8 @@ const winLinePercent = teamPointsNeededToWin
       const leader =
         playerNames(leaderPlayerIds, playerRows) ??
         (hole.winning_side === "team_a"
-          ? match?.team_a_name ?? "Team A"
-          : match?.team_b_name ?? "Team B");
+          ? currentTeamName(match?.team_a_id, match?.team_a_name ?? "Team A")
+          : currentTeamName(match?.team_b_id, match?.team_b_name ?? "Team B"));
 
       if (isVegas) {
         const vegasPointsWon =
@@ -806,12 +815,11 @@ const winLinePercent = teamPointsNeededToWin
                 style={{
                   borderLeftWidth: "6px",
                   borderLeftColor:
-                    teamRows.find((team) => team.name === match.team_a_name)
-                      ?.color ?? "#1f7a4d",
+                    currentTeamColor(match.team_a_id),
                 }}
               >
                 <p className="text-[10px] font-black uppercase tracking-[0.15em] text-danvers-brass">
-                  {match.team_a_name ?? "Team A"}
+                  {currentTeamName(match.team_a_id, match.team_a_name ?? "Team A")}
                 </p>
 
                 <p className="mt-1 text-sm font-black leading-tight">
@@ -861,8 +869,8 @@ const winLinePercent = teamPointsNeededToWin
           )}{" "}
           {Number(latestHole.team_a_vegas_points ?? 0) >
           Number(latestHole.team_b_vegas_points ?? 0)
-            ? match.team_a_name ?? "Team A"
-            : match.team_b_name ?? "Team B"}
+            ? currentTeamName(match.team_a_id, match.team_a_name ?? "Team A")
+            : currentTeamName(match.team_b_id, match.team_b_name ?? "Team B")}
         </p>
       ) : (
         <p className="mt-1 text-[9px] font-black text-danvers-muted">
@@ -884,12 +892,11 @@ const winLinePercent = teamPointsNeededToWin
                 style={{
                   borderRightWidth: "6px",
                   borderRightColor:
-                    teamRows.find((team) => team.name === match.team_b_name)
-                      ?.color ?? "#1f7a4d",
+                    currentTeamColor(match.team_b_id),
                 }}
               >
                 <p className="text-[10px] font-black uppercase tracking-[0.15em] text-danvers-brass">
-                  {match.team_b_name ?? "Team B"}
+                  {currentTeamName(match.team_b_id, match.team_b_name ?? "Team B")}
                 </p>
 
                 <p className="mt-1 text-sm font-black leading-tight">
